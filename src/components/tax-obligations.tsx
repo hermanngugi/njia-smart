@@ -3,7 +3,8 @@ import { Link } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Plus, Trash2, Upload, Download, Receipt, ChevronDown, ChevronRight, FileText } from "lucide-react";
-import { formatDate, daysUntil, STATUS_COLORS, statusLabel } from "@/lib/format";
+import { formatDate, formatDateTime, daysUntil, STATUS_COLORS, statusLabel } from "@/lib/format";
+import { TaxAssigneeSelect } from "@/components/tax-assignee-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +23,7 @@ export function TaxObligations({ clientId }: { clientId: string }) {
   const { user, isAdmin, canCreate, canDelete } = useAuth();
   const [rows, setRows] = useState<any[]>([]);
   const [policies, setPolicies] = useState<any[]>([]);
+  const [staff, setStaff] = useState<any[]>([]);
   const [docs, setDocs] = useState<Record<string, any[]>>({});
   const [invoices, setInvoices] = useState<Record<string, any>>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -36,10 +38,12 @@ export function TaxObligations({ clientId }: { clientId: string }) {
   const [billBusy, setBillBusy] = useState(false);
 
   async function load() {
-    const [{ data: tax }, { data: pol }] = await Promise.all([
+    const [{ data: tax }, { data: pol }, { data: prof }] = await Promise.all([
       supabase.from("tax_returns").select("*").eq("client_id", clientId).order("due_date"),
       supabase.from("tax_policies").select("*").order("sort_order"),
+      supabase.from("profiles").select("id, full_name").order("full_name"),
     ]);
+    setStaff(prof ?? []);
     const list = tax ?? [];
     setRows(list);
     setPolicies(pol ?? []);
@@ -80,8 +84,9 @@ export function TaxObligations({ clientId }: { clientId: string }) {
   }
 
   async function setStatus(id: string, status: string) {
-    const { error } = await supabase.from("tax_returns").update({ status }).eq("id", id);
+    const { data, error } = await supabase.from("tax_returns").update({ status }).eq("id", id).select("id");
     if (error) toast.error(error.message);
+    else if (!data || data.length === 0) toast.error("You don't have permission to update this filing.");
     else { if (status === "filed") toast.success("Marked filed — next period added automatically"); load(); }
   }
   async function remove(id: string) {
@@ -199,6 +204,14 @@ export function TaxObligations({ clientId }: { clientId: string }) {
                     {d !== null && d >= 0 && d <= 3 && <span className="ml-2 text-xs text-accent">due in {d}d</span>}
                   </div>
                   <div className="flex items-center gap-2">
+                    <TaxAssigneeSelect
+                      returnId={r.id}
+                      value={r.assigned_to}
+                      staff={staff}
+                      assignedAt={r.assigned_at}
+                      label={`${typeLabel(type)} — due ${formatDate(r.due_date)}`}
+                      onChanged={load}
+                    />
                     <select value={r.status} onChange={e => setStatus(r.id, e.target.value)} className={`h-7 px-2 rounded text-xs border bg-background capitalize ${STATUS_COLORS[r.status]}`}>
                       {STATUSES.map(s => <option key={s} value={s}>{statusLabel(s)}</option>)}
                     </select>
@@ -239,7 +252,8 @@ export function TaxObligations({ clientId }: { clientId: string }) {
                         <div className="text-sm">
                           <span className="px-1.5 py-0.5 rounded text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200 mr-2">Filed</span>
                           {r.period_end ? `Period ending ${formatDate(r.period_end)}` : `Due ${formatDate(r.due_date)}`}
-                          <span className="text-muted-foreground"> · filed {formatDate(r.filed_at)}</span>
+                          <span className="text-muted-foreground"> · filed {formatDateTime(r.filed_at)}{r.filed_by && staff.find(s => s.id === r.filed_by) ? ` by ${staff.find(s => s.id === r.filed_by)?.full_name}` : ""}</span>
+                          <span className="text-muted-foreground text-xs"> · due {formatDate(r.due_date)}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           {inv ? (

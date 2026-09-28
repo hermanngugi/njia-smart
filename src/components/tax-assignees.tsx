@@ -3,8 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { UserPlus, X, Users } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { formatDateTime } from "@/lib/format";
 
-type Row = { id: string; user_id: string; role: string | null; assigned_by?: string | null; profile?: { full_name: string | null } | null };
+type Row = { id: string; user_id: string; role: string | null; created_at?: string | null; assigned_by?: string | null; profile?: { full_name: string | null } | null };
 
 export function TaxAssignees({ taxReturnId, compact = false }: { taxReturnId: string; compact?: boolean }) {
   const { user, isAdmin } = useAuth();
@@ -57,20 +58,29 @@ export function TaxAssignees({ taxReturnId, compact = false }: { taxReturnId: st
         {rows.length === 0 ? (
           <span className="text-xs text-muted-foreground">—</span>
         ) : rows.slice(0, 3).map(r => (
-          <span key={r.id} className="text-xs px-1.5 py-0.5 rounded bg-muted">{r.profile?.full_name ?? "?"}</span>
+          <span key={r.id} className="text-xs px-1.5 py-0.5 rounded bg-muted" title={r.created_at ? `Added ${formatDateTime(r.created_at)}` : undefined}>{r.profile?.full_name ?? "?"}</span>
         ))}
         {rows.length > 3 && <span className="text-xs text-muted-foreground">+{rows.length - 3}</span>}
         <button onClick={() => setOpen(o => !o)} className="text-xs text-primary inline-flex items-center gap-0.5" title="Add collaborator">
           <UserPlus className="h-3 w-3" />
         </button>
         {open && (
-          <div className="absolute z-40 mt-6 bg-card border rounded-md shadow-md p-2 flex gap-1">
-            <select value={userId} onChange={e => setUserId(e.target.value)} className="h-7 px-2 rounded border bg-background text-xs">
-              <option value="">Add staff…</option>
-              {available.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
-            </select>
-            <button onClick={add} className="h-7 px-2 rounded bg-primary text-primary-foreground text-xs">Add</button>
-            <button onClick={() => setOpen(false)} className="text-xs"><X className="h-3 w-3" /></button>
+          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setOpen(false)}>
+            <div onClick={e => e.stopPropagation()} className="bg-card w-full max-w-sm rounded-lg border shadow-lg p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold">Add collaborator</h3>
+                <button onClick={() => setOpen(false)} aria-label="Close"><X className="h-4 w-4" /></button>
+              </div>
+              <select value={userId} onChange={e => setUserId(e.target.value)} className="w-full h-9 px-2 rounded border bg-background text-sm">
+                <option value="">Select staff…</option>
+                {available.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+              </select>
+              <input value={role} onChange={e => setRole(e.target.value)} placeholder="Role (e.g. Preparer, Reviewer)" className="w-full h-9 px-2 rounded border bg-background text-sm" />
+              <div className="flex justify-end gap-2">
+                <button onClick={() => setOpen(false)} className="h-8 px-3 rounded border text-xs">Cancel</button>
+                <button onClick={add} disabled={!userId} className="h-8 px-3 rounded bg-primary text-primary-foreground text-xs disabled:opacity-50">Add</button>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -102,6 +112,7 @@ export function TaxAssignees({ taxReturnId, compact = false }: { taxReturnId: st
               <div>
                 <span className="font-medium">{r.profile?.full_name ?? "Unknown"}</span>
                 {r.role && <span className="text-xs text-muted-foreground ml-2">{r.role}</span>}
+                {r.created_at && <span className="text-[11px] text-muted-foreground ml-2">· added {formatDateTime(r.created_at)}</span>}
               </div>
               {canRemove(r) && <button onClick={() => remove(r.id)} className="text-muted-foreground hover:text-destructive"><X className="h-3.5 w-3.5" /></button>}
             </div>
