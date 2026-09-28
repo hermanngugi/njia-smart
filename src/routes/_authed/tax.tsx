@@ -136,6 +136,11 @@ function TaxPage() {
     return { flagged: { overdue, duesoon, unassigned }, overdueCells, duesoonCells, unassignedCells };
   }, [clients, activePolicies, obligationMap, returnsByKey]);
 
+  const obligatedClientCount = useMemo(
+    () => clients.filter(c => activePolicies.some(p => obligationMap.get(`${c.id}:${p.tax_type}`))).length,
+    [clients, activePolicies, obligationMap]
+  );
+
   const displayClients = useMemo(() => {
     if (accFilter === "all") return filteredClients;
     const set = accStats.flagged[accFilter];
@@ -183,41 +188,36 @@ function TaxPage() {
     else { toast.success(filed ? "Marked filed" : "Reopened"); load(); }
   }
 
-  function renderChecklistTable(pol: any) {
+  // The checklist only lists clients who are obligated for that tax type —
+  // each row is the client's current filing. Obligations are added from the
+  // client's own Tax tab, so un-obligated clients are never listed here.
+  function obligatedRows(pol: any) {
+    return displayClients.filter(c => obligationMap.get(`${c.id}:${pol.tax_type}`));
+  }
+
+  function renderChecklistTable(pol: any, rows: any[] = obligatedRows(pol)) {
     return (
       <div key={pol.tax_type} className="bg-card border rounded-lg overflow-hidden">
         <div className="px-3 py-2 border-b text-xs text-muted-foreground flex items-center justify-between gap-3">
           <span>
-            <span className="font-medium text-foreground">{pol.label}</span> — check a client on to add the obligation (schedules the first open filing); tick "Filed" once submitted to auto-renew the next period.
+            <span className="font-medium text-foreground">{pol.label}</span> — {rows.length} obligated client{rows.length === 1 ? "" : "s"}. Tick "Filed" once submitted to auto-renew the next period.
           </span>
           <span className="capitalize whitespace-nowrap">{pol.cadence} · due day {pol.due_day}</span>
         </div>
         <table className="w-full text-sm">
           <thead className="bg-muted/40 text-left text-xs text-muted-foreground border-b">
-            <tr><th className="py-2 px-3 w-10"></th><th className="py-2 px-3">Client</th><th className="py-2 px-3">Current filing</th><th className="py-2 px-3 w-28">Filed?</th></tr>
+            <tr><th className="py-2 px-3">Client</th><th className="py-2 px-3">Current filing</th><th className="py-2 px-3 w-28">Filed?</th><th className="py-2 px-3 w-24"></th></tr>
           </thead>
           <tbody>
-            {displayClients.length === 0 && <tr><td colSpan={4} className="py-8 text-center text-muted-foreground">No clients match.</td></tr>}
-            {displayClients.map(c => {
+            {rows.length === 0 && <tr><td colSpan={4} className="py-8 text-center text-muted-foreground">No obligated clients{clientFilter || accFilter !== "all" ? " match your filters" : ` for ${pol.label} yet — add the obligation from the client's Tax tab`}.</td></tr>}
+            {rows.map(c => {
               const key = `${c.id}:${pol.tax_type}`;
-              const obligated = obligationMap.get(key) ?? false;
-              const cur = obligated ? currentReturn(c.id, pol.tax_type) : null;
+              const cur = currentReturn(c.id, pol.tax_type);
               return (
                 <tr key={c.id} className="border-b last:border-0 hover:bg-muted/20">
-                  <td className="py-1.5 px-3">
-                    <input
-                      type="checkbox"
-                      checked={obligated}
-                      disabled={busyCell === key || !isAdmin}
-                      title={isAdmin ? undefined : "Only admins/directors can change obligations"}
-                      onChange={e => toggleObligation(c.id, pol.tax_type, e.target.checked)}
-                    />
-                  </td>
                   <td className="py-1.5 px-3 font-medium">{c.company_name}</td>
                   <td className="py-1.5 px-3">
-                    {!obligated ? (
-                      <span className="text-muted-foreground/50 text-xs">Not obligated</span>
-                    ) : !cur ? (
+                    {!cur ? (
                       <span className="text-xs text-muted-foreground">Scheduling…</span>
                     ) : (
                       <Link to="/tax/$type" params={{ type: pol.tax_type }} search={{ client: c.id }} className="inline-block hover:opacity-80">
@@ -226,7 +226,7 @@ function TaxPage() {
                     )}
                   </td>
                   <td className="py-1.5 px-3">
-                    {obligated && cur && (
+                    {cur && (
                       <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs" title={cur.status === "filed" ? "Filed — uncheck to reopen" : "Check off once filed"}>
                         <input
                           type="checkbox"
@@ -236,6 +236,18 @@ function TaxPage() {
                         />
                         {cur.status === "filed" ? "Filed" : "Mark filed"}
                       </label>
+                    )}
+                  </td>
+                  <td className="py-1.5 px-3 text-right">
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        disabled={busyCell === key}
+                        onClick={() => { if (confirm(`Stop the ${pol.label} obligation for ${c.company_name}? Open filings stay, but nothing new is scheduled.`)) toggleObligation(c.id, pol.tax_type, false); }}
+                        className="text-[11px] text-muted-foreground hover:text-destructive"
+                      >
+                        Stop
+                      </button>
                     )}
                   </td>
                 </tr>
@@ -346,7 +358,7 @@ function TaxPage() {
             </div>
             <input placeholder="Filter clients…" value={clientFilter} onChange={e => setClientFilter(e.target.value)} className="h-9 w-64 px-3 rounded-md border bg-background text-sm" />
             <div className="flex flex-wrap gap-2 ml-auto">
-              <ChecklistChip active={accFilter === "all"} onClick={() => setAccFilter("all")} icon={LayoutGrid} label="All clients" value={clients.length} tone="muted" />
+              <ChecklistChip active={accFilter === "all"} onClick={() => setAccFilter("all")} icon={LayoutGrid} label="All obligated" value={obligatedClientCount} tone="muted" />
               <ChecklistChip active={accFilter === "overdue"} onClick={() => setAccFilter("overdue")} icon={AlertTriangle} label="Overdue" value={accStats.flagged.overdue.size} tone="destructive" />
               <ChecklistChip active={accFilter === "duesoon"} onClick={() => setAccFilter("duesoon")} icon={Clock} label="Due ≤7 days" value={accStats.flagged.duesoon.size} tone="amber" />
               <ChecklistChip active={accFilter === "unassigned"} onClick={() => setAccFilter("unassigned")} icon={UserX} label="Unassigned" value={accStats.flagged.unassigned.size} tone="amber" />
@@ -356,9 +368,20 @@ function TaxPage() {
           {activePolicies.length === 0 ? (
             <p className="text-sm text-muted-foreground p-4">No active tax policies yet. Ask an admin to configure one under Settings.</p>
           ) : checklistType === ALL_TYPES ? (
-            <div className="space-y-4">
-              {activePolicies.map(pol => renderChecklistTable(pol))}
-            </div>
+            (() => {
+              const groups = activePolicies
+                .map(pol => ({ pol, rows: obligatedRows(pol) }))
+                .filter(g => g.rows.length > 0);
+              return groups.length === 0 ? (
+                <p className="text-sm text-muted-foreground p-4">
+                  No obligated clients{clientFilter || accFilter !== "all" ? " match your filters" : " yet — add tax obligations from a client's Tax tab"}.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {groups.map(g => renderChecklistTable(g.pol, g.rows))}
+                </div>
+              );
+            })()
           ) : (
             (() => {
               const pol = activePolicies.find(p => p.tax_type === checklistType);
