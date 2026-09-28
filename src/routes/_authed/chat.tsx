@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import {
-  Hash, Users2, Plus, Send, Paperclip, X, Loader2, MessageSquare,
+  Hash, Users2, Plus, Send, Paperclip, X, Loader2, MessageSquare, Trash2,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authed/chat")({
@@ -141,8 +141,38 @@ function ChatPage() {
 
   // ---- load + subscribe to messages for the active channel ---------------
   async function loadMessages(channelId: string) {
-    const { data } = await supabase.from("chat_messages").select("*").eq("channel_id", channelId).order("created_at");
-    setMessages((data as Message[]) ?? []);
+    const [msgRes, memRes, hideRes] = await Promise.all([
+      supabase.from("chat_messages").select("*").eq("channel_id", channelId).order("created_at"),
+      user
+        ? supabase.from("chat_channel_members").select("cleared_at").eq("channel_id", channelId).eq("user_id", user.id).maybeSingle()
+        : Promise.resolve({ data: null as any }),
+      user
+        ? supabase.from("chat_message_hides").select("message_id").eq("user_id", user.id)
+        : Promise.resolve({ data: [] as any[] }),
+    ]);
+    // Personal view only: hide what I cleared or deleted for myself.
+    const clearedAt = (memRes.data as any)?.cleared_at as string | null | undefined;
+    const hidden = new Set(((hideRes.data as any[]) ?? []).map((h) => h.message_id));
+    const visible = ((msgRes.data as Message[]) ?? []).filter(
+      (m) => !hidden.has(m.id) && (!clearedAt || m.created_at > clearedAt),
+    );
+    setMessages(visible);
+  }
+
+  async function deleteMessageForMe(id: string) {
+    if (!confirm("Delete this message for you? The other person will still see it.")) return;
+    const { error } = await supabase.rpc("hide_chat_message_for_me", { _message_id: id });
+    if (error) { toast.error(error.message); return; }
+    setMessages((prev) => prev.filter((m) => m.id !== id));
+  }
+
+  async function clearChatForMe() {
+    if (!activeId) return;
+    if (!confirm("Clear this chat for you? The other person will still see the messages.")) return;
+    const { error } = await supabase.rpc("clear_chat_for_me", { _channel_id: activeId });
+    if (error) { toast.error(error.message); return; }
+    setMessages([]);
+    toast.success("Chat cleared");
   }
 
   useEffect(() => {
@@ -252,13 +282,21 @@ function ChatPage() {
           <>
             <div className="h-14 border-b flex items-center gap-2 px-4 font-medium">
               {channelIcon(active)} {channelLabel(active)}
+              <button onClick={clearChatForMe} className="ml-auto text-xs font-normal text-muted-foreground hover:text-destructive inline-flex items-center gap-1">
+                <Trash2 className="h-3.5 w-3.5" /> Clear chat
+              </button>
             </div>
             <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
               {messages.map((m) => {
                 const mine = m.sender_id === user?.id;
                 const p = profileById[m.sender_id];
                 return (
-                  <div key={m.id} className={`flex gap-2 ${mine ? "justify-end" : "justify-start"}`}>
+                  <div key={m.id} className={`group flex items-start gap-2 ${mine ? "justify-end" : "justify-start"}`}>
+                    {mine && (
+                      <button onClick={() => deleteMessageForMe(m.id)} title="Delete for me" className="mt-2 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                     {!mine && (
                       <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold shrink-0">
                         {initials(p?.full_name)}
@@ -276,6 +314,11 @@ function ChatPage() {
                         {new Date(m.created_at).toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit" })}
                       </div>
                     </div>
+                    {!mine && (
+                      <button onClick={() => deleteMessageForMe(m.id)} title="Delete for me" className="mt-2 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
                 );
               })}
