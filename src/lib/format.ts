@@ -2,6 +2,17 @@ export function formatDate(d?: string | null) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-KE", { day: "2-digit", month: "short", year: "numeric" });
 }
+// Date + time, for records where "when exactly" matters (filed, completed,
+// paid, assigned). formatDate() above is date-only and is kept for due dates.
+export function formatDateTime(d?: string | null) {
+  if (!d) return "—";
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return "—";
+  return dt.toLocaleString("en-KE", {
+    day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
 export function daysUntil(d?: string | null) {
   if (!d) return null;
   const diff = Math.ceil((new Date(d).getTime() - Date.now()) / 86400000);
