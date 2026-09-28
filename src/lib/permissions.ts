@@ -144,6 +144,22 @@ for (const role of Object.keys(ROLE_ACCESS) as AppRole[]) {
   ROLE_ACCESS[role].ict_service_desk = role === "admin" ? "full" : "assigned";
 }
 
+// Accounts (financial records) is restricted to Director, Admin and
+// Accountant. Everyone else — including assistants/interns, who would
+// otherwise inherit "assigned" access from ASSISTANT_ASSIGNED — gets none, so
+// the sidebar entry is hidden for them.
+const ACCOUNTS_ROLES: AppRole[] = ["director", "admin", "accountant"];
+for (const role of Object.keys(ROLE_ACCESS) as AppRole[]) {
+  ROLE_ACCESS[role].accounts = ACCOUNTS_ROLES.includes(role) ? "full" : "none";
+}
+
+// Activity & Team (staff management and the audit trail) is Admin only. The
+// Director no longer gets these by virtue of "full access across the board".
+for (const role of Object.keys(ROLE_ACCESS) as AppRole[]) {
+  ROLE_ACCESS[role].team = role === "admin" ? "full" : "none";
+  ROLE_ACCESS[role].activity = role === "admin" ? "full" : "none";
+}
+
 /** Highest access level a user has on a module, across all their roles. */
 export function getModuleAccess(roles: AppRole[], moduleKey: ModuleKey): AccessLevel {
   let best: AccessLevel = "none";
