@@ -45,6 +45,9 @@ export const createStaff = createServerFn({ method: "POST" })
       phone: data.phone ?? null,
     });
 
+    // The signup trigger gives every new user a default staff role; replace
+    // it with the role chosen here so they end up with exactly that one.
+    await supabaseAdmin.from("user_roles").delete().eq("user_id", uid);
     await supabaseAdmin.from("user_roles").insert({ user_id: uid, role: data.role as any });
     return { ok: true, user_id: uid };
   });
