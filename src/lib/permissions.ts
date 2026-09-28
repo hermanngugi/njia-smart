@@ -137,12 +137,11 @@ for (const role of Object.keys(ROLE_ACCESS) as AppRole[]) {
 // ICT Service Desk is a separate module from ICT (projects) and is open to
 // everyone: every role can see the module and raise/see their own tickets
 // ("assigned" — same "own records only" semantics tasks already use). Full
-// oversight — every ticket, plus asset/maintenance detail — is reserved for
-// Director/Admin, who already get "full" here via levels(ALL_MODULES) above.
+// oversight — every ticket, plus asset detail — is reserved for the Admin
+// role ONLY. The Director gets no special access here (raises and sees their
+// own tickets like any other staff member).
 for (const role of Object.keys(ROLE_ACCESS) as AppRole[]) {
-  if (role !== "director" && role !== "admin") {
-    ROLE_ACCESS[role].ict_service_desk = "assigned";
-  }
+  ROLE_ACCESS[role].ict_service_desk = role === "admin" ? "full" : "assigned";
 }
 
 /** Highest access level a user has on a module, across all their roles. */
