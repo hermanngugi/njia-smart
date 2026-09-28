@@ -53,19 +53,23 @@ function ChatPage() {
   const [unreadChannelIds, setUnreadChannelIds] = useState<Set<string>>(new Set());
   const [dmOtherUserId, setDmOtherUserId] = useState<Record<string, string>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
+  const channelsRef = useRef<Channel[]>([]);
+  channelsRef.current = channels;
 
   // ---- load sidebar data --------------------------------------------------
   async function loadChannels() {
     const [chRes, memRes] = await Promise.all([
       supabase.from("chat_channels").select("*").order("created_at"),
       user
-        ? supabase.from("chat_channel_members").select("channel_id").eq("user_id", user.id)
+        ? supabase.from("chat_channel_members").select("channel_id, hidden_at").eq("user_id", user.id)
         : Promise.resolve({ data: [] as any[] }),
     ]);
     // DMs/groups are private: show only team chat and channels I'm a member
     // of. (The DB policy enforces this too; this keeps the sidebar blank for
     // anyone who hasn't been messaged, even if a loose policy slips through.)
-    const mine = new Set(((memRes.data as any[]) ?? []).map((m) => m.channel_id));
+    // Chats I deleted (hidden_at set) stay out of the list until someone
+    // writes again — the DB then clears hidden_at.
+    const mine = new Set(((memRes.data as any[]) ?? []).filter((m) => !m.hidden_at).map((m) => m.channel_id));
     const visible = ((chRes.data as Channel[]) ?? []).filter((c) => c.kind === "team" || mine.has(c.id));
     setChannels(visible);
   }
@@ -76,6 +80,21 @@ function ChatPage() {
     setProfileById(Object.fromEntries(list.map((p) => [p.id, p])));
   }
   useEffect(() => { loadChannels(); loadDirectory(); }, [user?.id]);
+
+  // A message in a chat that isn't in my list (e.g. one I deleted) brings it
+  // back. RLS means I only receive events for chats I'm a member of.
+  useEffect(() => {
+    if (!user) return;
+    const ch = supabase
+      .channel("chat-new-conversations-" + user.id)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" },
+        (payload) => {
+          const cid = (payload.new as any)?.channel_id;
+          if (cid && !channelsRef.current.some((c) => c.id === cid)) loadChannels();
+        })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [user?.id]);
 
   // ---- who's on the other side of each DM (so the sidebar can show a
   // real name instead of the generic "Direct message" label) -------------
@@ -164,6 +183,18 @@ function ChatPage() {
     const { error } = await supabase.rpc("hide_chat_message_for_me", { _message_id: id });
     if (error) { toast.error(error.message); return; }
     setMessages((prev) => prev.filter((m) => m.id !== id));
+  }
+
+  async function deleteChatForMe() {
+    if (!activeId || !active || active.kind === "team") return;
+    if (!confirm(`Delete your chat with ${channelLabel(active)}? It will be removed from your list. The other person will still have their copy.`)) return;
+    const { error } = await supabase.rpc("delete_chat_for_me", { _channel_id: activeId });
+    if (error) { toast.error(error.message); return; }
+    const remaining = channels.filter((c) => c.id !== activeId);
+    setChannels(remaining);
+    setMessages([]);
+    setActiveId(remaining.find((c) => c.kind === "team")?.id ?? remaining[0]?.id ?? null);
+    toast.success("Chat deleted");
   }
 
   async function clearChatForMe() {
@@ -282,9 +313,16 @@ function ChatPage() {
           <>
             <div className="h-14 border-b flex items-center gap-2 px-4 font-medium">
               {channelIcon(active)} {channelLabel(active)}
-              <button onClick={clearChatForMe} className="ml-auto text-xs font-normal text-muted-foreground hover:text-destructive inline-flex items-center gap-1">
-                <Trash2 className="h-3.5 w-3.5" /> Clear chat
-              </button>
+              <div className="ml-auto flex items-center gap-4">
+                <button onClick={clearChatForMe} className="text-xs font-normal text-muted-foreground hover:text-destructive inline-flex items-center gap-1">
+                  <Trash2 className="h-3.5 w-3.5" /> Clear chat
+                </button>
+                {active.kind !== "team" && (
+                  <button onClick={deleteChatForMe} className="text-xs font-normal text-muted-foreground hover:text-destructive inline-flex items-center gap-1">
+                    <X className="h-3.5 w-3.5" /> Delete chat
+                  </button>
+                )}
+              </div>
             </div>
             <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
               {messages.map((m) => {
