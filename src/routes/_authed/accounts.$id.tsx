@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ArrowLeft, Plus, Trash2, Printer, Save, Paperclip, FileText } from "lucide-react";
-import { formatDate, STATUS_COLORS } from "@/lib/format";
+import { formatDate, formatDateTime, STATUS_COLORS } from "@/lib/format";
 
 export const Route = createFileRoute("/_authed/accounts/$id")({ component: InvoiceDetail });
 
@@ -133,6 +133,7 @@ function InvoiceDetail() {
             <div className="text-2xl font-bold text-primary">INVOICE</div>
             <div className="text-sm font-mono">{inv.invoice_number}</div>
             <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[inv.status] ?? "bg-muted"}`}>{inv.status}</span>
+            {inv.status === "paid" && inv.paid_at && <div className="text-[11px] text-muted-foreground mt-1">Paid {formatDateTime(inv.paid_at)}</div>}
           </div>
         </div>
 

@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ArrowLeft, Trash2, Save, X } from "lucide-react";
-import { formatDate, daysUntil, periodsOverdue, STATUS_COLORS } from "@/lib/format";
+import { formatDate, formatDateTime, daysUntil, periodsOverdue, STATUS_COLORS } from "@/lib/format";
+import { TaxAssigneeSelect } from "@/components/tax-assignee-select";
 import { TaxAssignees } from "@/components/tax-assignees";
 import { useAuth } from "@/lib/auth";
 
@@ -19,7 +20,7 @@ const STATUSES = ["pending","in_progress","filed","overdue"];
 function TaxTypePage() {
   const { type } = useParams({ from: "/_authed/tax/$type" });
   const search = Route.useSearch();
-  const { isAdmin, canDelete } = useAuth();
+  const { user, isAdmin, canDelete } = useAuth();
   const [rows, setRows] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [staff, setStaff] = useState<any[]>([]);
@@ -64,8 +65,10 @@ function TaxTypePage() {
   ), [rows, filter]);
 
   async function setStatus(id: string, status: string) {
-    const { error } = await supabase.from("tax_returns").update({ status: status as any }).eq("id", id);
-    if (error) toast.error(error.message); else load();
+    const { data, error } = await supabase.from("tax_returns").update({ status: status as any }).eq("id", id).select("id");
+    if (error) toast.error(error.message);
+    else if (!data || data.length === 0) toast.error("You don't have permission to update this filing.");
+    else load();
   }
   async function remove(id: string) {
     if (!confirm("Remove this tax return?")) return;
@@ -74,8 +77,17 @@ function TaxTypePage() {
   }
   async function saveEdit() {
     const { id, clients: _c, assignee: _a, ...payload } = editing;
-    const { error } = await supabase.from("tax_returns").update(payload).eq("id", id);
-    if (error) toast.error(error.message); else { toast.success("Saved"); setEditing(null); load(); }
+    const before = rows.find(r => r.id === id);
+    const { data, error } = await supabase.from("tax_returns").update(payload).eq("id", id).select("id");
+    if (error) { toast.error(error.message); return; }
+    if (!data || data.length === 0) { toast.error("You don't have permission to edit this filing."); return; }
+    if (payload.assigned_to && payload.assigned_to !== before?.assigned_to && payload.assigned_to !== user?.id) {
+      await supabase.from("notifications").insert({
+        user_id: payload.assigned_to, type: "tax", title: "Tax filing assigned to you",
+        body: `${label} — ${before?.clients?.company_name ?? "client"}`, link: "/tax",
+      } as any);
+    }
+    toast.success("Saved"); setEditing(null); load();
   }
 
   const label = policy?.label ?? type.toUpperCase();
@@ -139,10 +151,10 @@ function TaxTypePage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-left text-xs text-muted-foreground border-b bg-muted/40">
-              <tr><th className="py-2 px-3">Client</th><th>Period</th><th>Due</th><th>Status</th><th>Assignee</th><th>Team</th><th>Docs</th><th>Billing</th><th>Notes</th><th></th></tr>
+              <tr><th className="py-2 px-3">Client</th><th>Period</th><th>Due</th><th>Status</th><th>Filed</th><th>Assignee</th><th>Team</th><th>Docs</th><th>Billing</th><th>Notes</th><th></th></tr>
             </thead>
             <tbody>
-              {filtered.length === 0 && <tr><td colSpan={10} className="py-10 text-center text-muted-foreground">No returns match your filters.</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={11} className="py-10 text-center text-muted-foreground">No returns match your filters.</td></tr>}
               {filtered.map(r => {
                 const d = daysUntil(r.due_date);
                 const over = periodsOverdue(r.due_date, cadence);
@@ -175,7 +187,26 @@ function TaxTypePage() {
                         </button>
                       )}
                     </td>
-                    <td className="text-xs">{r.assignee?.full_name ?? <span className="text-muted-foreground">—</span>}</td>
+                    <td className="text-xs whitespace-nowrap">
+                      {r.status === "filed" && r.filed_at ? (
+                        <>
+                          <div>{formatDateTime(r.filed_at)}</div>
+                          {r.filed_by && staff.find(s => s.id === r.filed_by) && (
+                            <div className="text-[10px] text-muted-foreground">by {staff.find(s => s.id === r.filed_by)?.full_name}</div>
+                          )}
+                        </>
+                      ) : <span className="text-muted-foreground">—</span>}
+                    </td>
+                    <td className="text-xs">
+                      <TaxAssigneeSelect
+                        returnId={r.id}
+                        value={r.assigned_to}
+                        staff={staff}
+                        assignedAt={r.assigned_at}
+                        label={`${label} — ${r.clients?.company_name ?? "client"}`}
+                        onChanged={load}
+                      />
+                    </td>
                     <td className="py-2 px-3 relative"><TaxAssignees taxReturnId={r.id} compact /></td>
                     <td className="text-xs text-muted-foreground">{docCounts[r.id] ? `${docCounts[r.id]} file${docCounts[r.id] > 1 ? "s" : ""}` : "—"}</td>
                     <td className="text-xs">
@@ -213,6 +244,7 @@ function TaxTypePage() {
               <select value={editing.status} onChange={e => setEditing({ ...editing, status: e.target.value })} className="mt-1 w-full h-9 px-3 rounded-md border bg-background text-sm capitalize">
                 {STATUSES.map(s => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
               </select>
+              {editing.filed_at && <p className="mt-1 text-[11px] text-muted-foreground">Filed {formatDateTime(editing.filed_at)}</p>}
             </div>
             <div>
               <label className="text-xs font-medium">Assignee</label>
@@ -220,6 +252,7 @@ function TaxTypePage() {
                 <option value="">— Unassigned —</option>
                 {staff.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
               </select>
+              {editing.assigned_to && editing.assigned_at && <p className="mt-1 text-[11px] text-muted-foreground">Assigned {formatDateTime(editing.assigned_at)}</p>}
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div><label className="text-xs font-medium">Period start</label><input type="date" value={editing.period_start ?? ""} onChange={e => setEditing({ ...editing, period_start: e.target.value || null })} className="mt-1 w-full h-9 px-3 rounded-md border bg-background text-sm" /></div>

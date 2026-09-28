@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ArrowLeft, Upload, Download, Eye, Trash2, FileText, Send, X } from "lucide-react";
-import { formatDate, STATUS_COLORS, statusLabel } from "@/lib/format";
+import { formatDate, formatDateTime, STATUS_COLORS, statusLabel } from "@/lib/format";
 import { useAuth } from "@/lib/auth";
 import { ClientAssignments } from "@/components/client-assignments";
 
@@ -244,7 +244,10 @@ function AuditDetail() {
               {tasks.filter(t => (t.stage ?? null) === activeCat).map(t => (
                 <div key={t.id} className="flex items-center gap-2 py-1.5 border-b last:border-0 text-sm">
                   <input type="checkbox" checked={t.status === "done"} onChange={ev => setTaskStatus(t.id, ev.target.checked ? "done" : "todo")} />
-                  <div className={`flex-1 ${t.status === "done" ? "line-through text-muted-foreground" : ""}`}>{t.title}</div>
+                  <div className="flex-1">
+                    <div className={t.status === "done" ? "line-through text-muted-foreground" : ""}>{t.title}</div>
+                    {t.status === "done" && t.completed_at && <div className="text-[10px] text-muted-foreground">Done {formatDateTime(t.completed_at)}</div>}
+                  </div>
                   <span className="text-xs text-muted-foreground">{t.assignee?.full_name ?? "—"}</span>
                   <span className="text-xs text-muted-foreground">{formatDate(t.due_date)}</span>
                   <select value={t.status} onChange={ev => setTaskStatus(t.id, ev.target.value)} className="h-7 px-2 rounded text-xs border bg-background capitalize">

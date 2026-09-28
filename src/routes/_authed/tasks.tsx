@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Plus, X, Pencil, Trash2, MessageSquare, Send } from "lucide-react";
-import { formatDate, daysUntil, STATUS_COLORS } from "@/lib/format";
+import { formatDate, formatDateTime, daysUntil, STATUS_COLORS } from "@/lib/format";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/_authed/tasks")({ component: TasksPage });
@@ -131,6 +131,9 @@ function TasksPage() {
                       <select value={t.status} onChange={e=>setStatus(t.id, e.target.value)} className={`h-7 px-2 rounded text-xs border bg-background capitalize ${STATUS_COLORS[t.status]}`}>
                         {["todo","in_progress","blocked","done"].map(s=><option key={s} value={s}>{s.replace(/_/g," ")}</option>)}
                       </select>
+                      {t.status === "done" && t.completed_at && (
+                        <div className="text-[10px] text-muted-foreground mt-0.5 whitespace-nowrap">Done {formatDateTime(t.completed_at)}</div>
+                      )}
                     </td>
                     <td className="pr-2 text-right space-x-1 whitespace-nowrap">
                       <button onClick={()=>setDetailId(t.id)} title="Comments" className="p-1 hover:text-primary"><MessageSquare className="h-3.5 w-3.5" /></button>

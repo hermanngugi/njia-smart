@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AlertTriangle, Clock, UserX, LayoutGrid, Check, ChevronDown, ChevronUp } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { daysUntil, periodsOverdue } from "@/lib/format";
+import { daysUntil, periodsOverdue, formatDateTime } from "@/lib/format";
+import { TaxAssigneeSelect } from "@/components/tax-assignee-select";
 
 export const Route = createFileRoute("/_authed/tax")({
   head: () => ({
@@ -44,7 +45,7 @@ function TaxPage() {
     setLoading(true);
     const [p, r, c, o, s] = await Promise.all([
       supabase.from("tax_policies").select("*").order("sort_order"),
-      supabase.from("tax_returns").select("id, client_id, return_type, status, due_date, assigned_to"),
+      supabase.from("tax_returns").select("id, client_id, return_type, status, due_date, assigned_to, assigned_at, filed_at, filed_by"),
       supabase.from("clients").select("id, company_name").order("company_name"),
       supabase.from("client_tax_obligations").select("*"),
       supabase.from("profiles").select("id, full_name"),
@@ -182,9 +183,10 @@ function TaxPage() {
   // without needing to drill into the per-type page first.
   async function markFiled(returnId: string, filed: boolean) {
     setBusyCell(returnId);
-    const { error } = await supabase.from("tax_returns").update({ status: filed ? "filed" : "pending" }).eq("id", returnId);
+    const { data, error } = await supabase.from("tax_returns").update({ status: filed ? "filed" : "pending" }).eq("id", returnId).select("id");
     setBusyCell(null);
     if (error) toast.error(error.message);
+    else if (!data || data.length === 0) toast.error("You don't have permission to update this filing.");
     else { toast.success(filed ? "Marked filed" : "Reopened"); load(); }
   }
 
@@ -206,10 +208,10 @@ function TaxPage() {
         </div>
         <table className="w-full text-sm">
           <thead className="bg-muted/40 text-left text-xs text-muted-foreground border-b">
-            <tr><th className="py-2 px-3">Client</th><th className="py-2 px-3">Current filing</th><th className="py-2 px-3 w-28">Filed?</th><th className="py-2 px-3 w-24"></th></tr>
+            <tr><th className="py-2 px-3">Client</th><th className="py-2 px-3">Current filing</th><th className="py-2 px-3">Assigned to</th><th className="py-2 px-3 w-44">Filed?</th><th className="py-2 px-3 w-24"></th></tr>
           </thead>
           <tbody>
-            {rows.length === 0 && <tr><td colSpan={4} className="py-8 text-center text-muted-foreground">No obligated clients{clientFilter || accFilter !== "all" ? " match your filters" : ` for ${pol.label} yet — add the obligation from the client's Tax tab`}.</td></tr>}
+            {rows.length === 0 && <tr><td colSpan={5} className="py-8 text-center text-muted-foreground">No obligated clients{clientFilter || accFilter !== "all" ? " match your filters" : ` for ${pol.label} yet — add the obligation from the client's Tax tab`}.</td></tr>}
             {rows.map(c => {
               const key = `${c.id}:${pol.tax_type}`;
               const cur = currentReturn(c.id, pol.tax_type);
@@ -227,15 +229,34 @@ function TaxPage() {
                   </td>
                   <td className="py-1.5 px-3">
                     {cur && (
-                      <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs" title={cur.status === "filed" ? "Filed — uncheck to reopen" : "Check off once filed"}>
-                        <input
-                          type="checkbox"
-                          checked={cur.status === "filed"}
-                          disabled={busyCell === cur.id}
-                          onChange={e => markFiled(cur.id, e.target.checked)}
-                        />
-                        {cur.status === "filed" ? "Filed" : "Mark filed"}
-                      </label>
+                      <TaxAssigneeSelect
+                        returnId={cur.id}
+                        value={cur.assigned_to}
+                        staff={staff}
+                        assignedAt={cur.assigned_at}
+                        label={`${pol.label} — ${c.company_name}`}
+                        onChanged={load}
+                      />
+                    )}
+                  </td>
+                  <td className="py-1.5 px-3">
+                    {cur && (
+                      <>
+                        <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs" title={cur.status === "filed" ? "Filed — uncheck to reopen" : "Check off once filed"}>
+                          <input
+                            type="checkbox"
+                            checked={cur.status === "filed"}
+                            disabled={busyCell === cur.id}
+                            onChange={e => markFiled(cur.id, e.target.checked)}
+                          />
+                          {cur.status === "filed" ? "Filed" : "Mark filed"}
+                        </label>
+                        {cur.status === "filed" && cur.filed_at && (
+                          <div className="text-[10px] text-muted-foreground mt-0.5">
+                            {formatDateTime(cur.filed_at)}{cur.filed_by && staffMap.get(cur.filed_by) ? ` · ${staffMap.get(cur.filed_by)}` : ""}
+                          </div>
+                        )}
+                      </>
                     )}
                   </td>
                   <td className="py-1.5 px-3 text-right">
@@ -412,10 +433,10 @@ function TaxPage() {
           <div className="bg-card border rounded-lg overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-muted/40 text-left text-xs text-muted-foreground border-b">
-                <tr><th className="py-2 px-3">Client</th><th className="py-2 px-3">Tax type</th><th className="py-2 px-3">Status</th><th className="py-2 px-3">Due date</th><th className="py-2 px-3">Filed on</th></tr>
+                <tr><th className="py-2 px-3">Client</th><th className="py-2 px-3">Tax type</th><th className="py-2 px-3">Status</th><th className="py-2 px-3">Due date</th><th className="py-2 px-3">Filed on</th><th className="py-2 px-3">Filed by</th></tr>
               </thead>
               <tbody>
-                {filteredReportRows.length === 0 && <tr><td colSpan={5} className="py-8 text-center text-muted-foreground">No obligations match this view.</td></tr>}
+                {filteredReportRows.length === 0 && <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">No obligations match this view.</td></tr>}
                 {filteredReportRows.map(row => (
                   <tr key={`${row.client.id}:${row.pol.tax_type}`} className="border-b last:border-0 hover:bg-muted/20">
                     <td className="py-1.5 px-3 font-medium">{row.client.company_name}</td>
@@ -428,7 +449,8 @@ function TaxPage() {
                       )}
                     </td>
                     <td className="py-1.5 px-3 text-xs">{row.cur?.due_date ?? "—"}</td>
-                    <td className="py-1.5 px-3 text-xs text-muted-foreground">{row.cur?.filed_at ? new Date(row.cur.filed_at).toLocaleDateString() : "—"}</td>
+                    <td className="py-1.5 px-3 text-xs text-muted-foreground whitespace-nowrap">{row.filed ? formatDateTime(row.cur?.filed_at) : "—"}</td>
+                    <td className="py-1.5 px-3 text-xs text-muted-foreground">{row.filed && row.cur?.filed_by ? (staffMap.get(row.cur.filed_by) ?? "—") : "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -474,6 +496,9 @@ function ChecklistCell({ row, cadence, assigneeName }: { row: any; cadence: stri
       <span className={`text-[11px] px-2 py-0.5 rounded-full capitalize ${statusClass}`}>
         {filed ? "Filed" : row.status.replace(/_/g, " ")}
       </span>
+      {filed && row.filed_at && (
+        <span className="text-[10px] text-muted-foreground">{formatDateTime(row.filed_at)}</span>
+      )}
       {!filed && (
         <span className={`text-[10px] ${over >= 1 ? "text-destructive font-medium" : d !== null && d <= 7 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
           {over >= 1 ? `${over}× overdue` : d !== null ? (d < 0 ? "overdue" : d === 0 ? "due today" : `due in ${d}d`) : "no due date"}
