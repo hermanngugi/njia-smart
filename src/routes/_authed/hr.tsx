@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useChildMatches } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -14,8 +14,17 @@ export const Route = createFileRoute("/_authed/hr")({
       { name: "description", content: "Employee records, documents, leave management and payslips." },
     ],
   }),
-  component: HrPage,
+  component: HrRoute,
 });
+
+// /hr/$id (an employee record) is a child route of /hr. Without an <Outlet />
+// the parent keeps rendering the directory and the record never opens, so show
+// the child whenever one is matched and the directory otherwise.
+function HrRoute() {
+  const childMatches = useChildMatches();
+  if (childMatches.length > 0) return <Outlet />;
+  return <HrPage />;
+}
 
 const TABS = ["Directory", "My Leave", "Approvals", "Payslips"] as const;
 
