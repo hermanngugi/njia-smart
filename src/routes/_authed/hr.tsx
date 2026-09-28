@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth, ROLE_LABELS, type AppRole } from "@/lib/auth";
+import { isHrManager } from "@/lib/permissions";
 import { formatDate } from "@/lib/format";
 import { Plus, X, Download, FileText, CheckCircle2, XCircle, Users } from "lucide-react";
 
@@ -18,13 +19,17 @@ export const Route = createFileRoute("/_authed/hr")({
 
 const TABS = ["Directory", "My Leave", "Approvals", "Payslips"] as const;
 
+type GenderFilter = "all" | "female" | "male" | "unset";
+
 function money(n: number, currency = "KES") {
   return `${currency} ` + Number(n || 0).toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function HrPage() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, roles: myRoles } = useAuth();
+  const isHrMgr = isHrManager(myRoles);
   const [tab, setTab] = useState<(typeof TABS)[number]>("Directory");
+  const [genderFilter, setGenderFilter] = useState<GenderFilter>("all");
 
   const [profiles, setProfiles] = useState<any[]>([]);
   const [rolesByUser, setRolesByUser] = useState<Record<string, string[]>>({});
@@ -71,6 +76,26 @@ function HrPage() {
     if (isAdmin) return true;
     return Object.values(employment).some((e: any) => e.manager_id === user?.id);
   }, [employment, isAdmin, user?.id]);
+
+  // Gender-restricted leave types (maternity/paternity) are only offered to
+  // employees whose recorded gender matches. No gender on file = not offered.
+  const myGender: string | undefined = user ? employment[user.id]?.gender : undefined;
+  const eligibleLeaveTypes = useMemo(
+    () => leaveTypes.filter(t => !t.eligible_gender || t.eligible_gender === myGender),
+    [leaveTypes, myGender]
+  );
+  const hiddenRestrictedTypes = leaveTypes.length - eligibleLeaveTypes.length;
+
+  const genderOf = (id: string): "female" | "male" | "unset" => (employment[id]?.gender as any) || "unset";
+  const genderCounts = useMemo(() => {
+    const c = { female: 0, male: 0, unset: 0 };
+    profiles.forEach(p => { c[genderOf(p.id)]++; });
+    return c;
+  }, [profiles, employment]);
+  const visibleProfiles = useMemo(
+    () => (isHrMgr && genderFilter !== "all" ? profiles.filter(p => genderOf(p.id) === genderFilter) : profiles),
+    [profiles, employment, genderFilter, isHrMgr]
+  );
 
   async function submitLeaveRequest(e: React.FormEvent) {
     e.preventDefault();
@@ -136,7 +161,21 @@ function HrPage() {
 
       {!loading && tab === "Directory" && (
         <div className="grid gap-3">
-          {profiles.map(p => {
+          {isHrMgr && (
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-muted-foreground">Filter by gender:</span>
+              {([
+                ["all", `All (${profiles.length})`],
+                ["female", `Female · maternity eligible (${genderCounts.female})`],
+                ["male", `Male · paternity eligible (${genderCounts.male})`],
+                ["unset", `Not set (${genderCounts.unset})`],
+              ] as [GenderFilter, string][]).map(([v, label]) => (
+                <button key={v} onClick={() => setGenderFilter(v)} className={`px-2.5 py-1 rounded-full border ${genderFilter === v ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:border-primary/50"}`}>{label}</button>
+              ))}
+            </div>
+          )}
+          {visibleProfiles.length === 0 && <div className="py-8 text-center text-sm text-muted-foreground">No employees match this filter.</div>}
+          {visibleProfiles.map(p => {
             const emp = employment[p.id];
             const manager = emp?.manager_id ? profiles.find(m => m.id === emp.manager_id) : null;
             return (
@@ -153,6 +192,9 @@ function HrPage() {
                     {(rolesByUser[p.id] || []).map(r => (
                       <span key={r} className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">{ROLE_LABELS[r as AppRole] || r}</span>
                     ))}
+                    {isHrMgr && emp?.gender && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-muted capitalize">{emp.gender}</span>
+                    )}
                     {emp?.employment_status && emp.employment_status !== "active" && (
                       <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100">{emp.employment_status.replace("_", " ")}</span>
                     )}
@@ -273,7 +315,7 @@ function HrPage() {
               </tbody>
             </table>
           </div>
-          {isAdmin && (
+          {isHrMgr && (
             <div className="p-3 border-t text-xs text-muted-foreground inline-flex items-center gap-2">
               <Users className="h-3.5 w-3.5" /> To publish a payslip for someone, open their record from the Directory tab.
             </div>
@@ -287,8 +329,11 @@ function HrPage() {
             <div className="flex justify-between"><h2 className="text-lg font-semibold">Request leave</h2><button type="button" onClick={() => setReqOpen(false)}><X className="h-4 w-4" /></button></div>
             <select required value={reqForm.leave_type_id} onChange={e => setReqForm({ ...reqForm, leave_type_id: e.target.value })} className="w-full h-9 px-3 rounded-md border bg-background text-sm">
               <option value="">Select leave type…</option>
-              {leaveTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              {eligibleLeaveTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
+            {hiddenRestrictedTypes > 0 && (
+              <p className="text-xs text-muted-foreground">Maternity/Paternity leave is offered once HR has recorded your gender details.</p>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <input required type="date" value={reqForm.start_date} onChange={e => setReqForm({ ...reqForm, start_date: e.target.value })} className="h-9 px-3 rounded-md border bg-background text-sm" />
               <input required type="date" value={reqForm.end_date} onChange={e => setReqForm({ ...reqForm, end_date: e.target.value })} className="h-9 px-3 rounded-md border bg-background text-sm" />

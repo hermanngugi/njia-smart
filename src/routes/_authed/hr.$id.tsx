@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth, ROLE_LABELS, type AppRole } from "@/lib/auth";
+import { isHrManager } from "@/lib/permissions";
 import { formatDate } from "@/lib/format";
 import { ArrowLeft, Upload, Download, Trash2, FileText, Plus, X } from "lucide-react";
 
@@ -11,6 +12,7 @@ export const Route = createFileRoute("/_authed/hr/$id")({ component: EmployeeHrP
 const EMPLOYMENT_TYPES = ["full_time", "part_time", "contract", "intern"];
 const EMPLOYMENT_STATUSES = ["active", "on_leave", "suspended", "terminated"];
 const DOC_TYPES = ["contract", "id", "tax_form", "certificate", "other"];
+const GENDERS = ["male", "female"];
 
 function money(n: number, currency = "KES") {
   return `${currency} ` + Number(n || 0).toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -18,8 +20,11 @@ function money(n: number, currency = "KES") {
 
 function EmployeeHrPage() {
   const { id } = Route.useParams();
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, roles: myRoles } = useAuth();
   const isSelf = user?.id === id;
+  // Director, admin and accountant manage employee records (personal details,
+  // documents, payslips). Everyone else only edits their own personal fields.
+  const isHrMgr = isHrManager(myRoles);
 
   const [profile, setProfile] = useState<any>(null);
   const [roles, setRoles] = useState<string[]>([]);
@@ -69,6 +74,7 @@ function EmployeeHrPage() {
       manager_id: emp.manager_id || null,
       date_hired: emp.date_hired || null,
       date_of_birth: emp.date_of_birth || null,
+      gender: emp.gender || null,
       national_id: emp.national_id || null,
       kra_pin: emp.kra_pin || null,
       gross_salary: emp.gross_salary === "" ? null : emp.gross_salary,
@@ -164,8 +170,8 @@ function EmployeeHrPage() {
 
   if (!profile) return <div className="text-sm text-muted-foreground">Loading…</div>;
 
-  const canEditEmployment = isAdmin;
-  const canEditOwnInfo = isSelf && !isAdmin;
+  const canEditEmployment = isHrMgr;
+  const canEditOwnInfo = isSelf && !isHrMgr;
 
   return (
     <div className="space-y-4 max-w-3xl">
@@ -183,7 +189,7 @@ function EmployeeHrPage() {
 
       {(canEditEmployment || isSelf) && (
         <form onSubmit={canEditEmployment ? saveEmployment : saveMyInfo} className="bg-card border rounded-lg p-5 space-y-3">
-          <h2 className="font-semibold">Employment record</h2>
+          <h2 className="font-semibold">Personal & employment details</h2>
           <div className="grid sm:grid-cols-2 gap-3">
             <Field label="Employee no."><input disabled={!canEditEmployment} value={emp.employee_no || ""} onChange={e => setEmp({ ...emp, employee_no: e.target.value })} className={input(canEditEmployment)} /></Field>
             <Field label="Manager">
@@ -204,6 +210,17 @@ function EmployeeHrPage() {
             </Field>
             <Field label="Date hired"><input disabled={!canEditEmployment} type="date" value={emp.date_hired || ""} onChange={e => setEmp({ ...emp, date_hired: e.target.value })} className={input(canEditEmployment)} /></Field>
             <Field label="Date of birth"><input disabled={!canEditEmployment && !canEditOwnInfo} type="date" value={emp.date_of_birth || ""} onChange={e => setEmp({ ...emp, date_of_birth: e.target.value })} className={input(canEditEmployment || canEditOwnInfo)} /></Field>
+            <Field label="Gender">
+              <select disabled={!canEditEmployment} value={emp.gender || ""} onChange={e => setEmp({ ...emp, gender: e.target.value })} className={input(canEditEmployment)}>
+                <option value="">Not set</option>
+                {GENDERS.map(g => <option key={g} value={g} className="capitalize">{g === "male" ? "Male" : "Female"}</option>)}
+              </select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {emp.gender === "female" ? "Eligible for Maternity Leave."
+                  : emp.gender === "male" ? "Eligible for Paternity Leave."
+                  : "Set gender to determine maternity/paternity leave eligibility."}
+              </p>
+            </Field>
             <Field label="National ID"><input disabled={!canEditEmployment && !canEditOwnInfo} value={emp.national_id || ""} onChange={e => setEmp({ ...emp, national_id: e.target.value })} className={input(canEditEmployment || canEditOwnInfo)} /></Field>
             <Field label="KRA PIN"><input disabled={!canEditEmployment && !canEditOwnInfo} value={emp.kra_pin || ""} onChange={e => setEmp({ ...emp, kra_pin: e.target.value })} className={input(canEditEmployment || canEditOwnInfo)} /></Field>
             {canEditEmployment && (
@@ -229,7 +246,7 @@ function EmployeeHrPage() {
         <div className="flex justify-between items-center">
           <h2 className="font-semibold">Documents</h2>
         </div>
-        {(isSelf || isAdmin) && (
+        {(isSelf || isHrMgr) && (
           <div className="grid sm:grid-cols-3 gap-2">
             <select value={docType} onChange={e => setDocType(e.target.value)} className="h-9 px-3 rounded-md border bg-background text-sm">
               {DOC_TYPES.map(t => <option key={t} value={t}>{t.replace("_", " ")}</option>)}
@@ -248,7 +265,7 @@ function EmployeeHrPage() {
               <div className="min-w-0 flex items-center gap-2 text-sm"><FileText className="h-4 w-4 text-muted-foreground shrink-0" /><span className="truncate">{d.title}</span><span className="text-xs text-muted-foreground shrink-0">({d.doc_type.replace("_", " ")})</span></div>
               <div className="flex items-center gap-2 shrink-0">
                 <button onClick={() => downloadDoc(d.file_path)} className="text-primary text-xs inline-flex items-center gap-1"><Download className="h-3 w-3" />Download</button>
-                {isAdmin && <button onClick={() => removeDoc(d.id, d.file_path)} className="text-destructive text-xs"><Trash2 className="h-3 w-3" /></button>}
+                {(isAdmin || (isHrMgr && d.uploaded_by === user?.id)) && <button onClick={() => removeDoc(d.id, d.file_path)} className="text-destructive text-xs"><Trash2 className="h-3 w-3" /></button>}
               </div>
             </div>
           ))}
@@ -271,7 +288,7 @@ function EmployeeHrPage() {
       <div className="bg-card border rounded-lg p-5 space-y-3">
         <div className="flex justify-between items-center">
           <h2 className="font-semibold">Payslips</h2>
-          {isAdmin && (
+          {isHrMgr && (
             <button onClick={() => setPayslipOpen(true)} className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs inline-flex items-center gap-1"><Plus className="h-3 w-3" />Publish payslip</button>
           )}
         </div>
