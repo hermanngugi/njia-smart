@@ -56,8 +56,18 @@ function ChatPage() {
 
   // ---- load sidebar data --------------------------------------------------
   async function loadChannels() {
-    const { data } = await supabase.from("chat_channels").select("*").order("created_at");
-    setChannels((data as Channel[]) ?? []);
+    const [chRes, memRes] = await Promise.all([
+      supabase.from("chat_channels").select("*").order("created_at"),
+      user
+        ? supabase.from("chat_channel_members").select("channel_id").eq("user_id", user.id)
+        : Promise.resolve({ data: [] as any[] }),
+    ]);
+    // DMs/groups are private: show only team chat and channels I'm a member
+    // of. (The DB policy enforces this too; this keeps the sidebar blank for
+    // anyone who hasn't been messaged, even if a loose policy slips through.)
+    const mine = new Set(((memRes.data as any[]) ?? []).map((m) => m.channel_id));
+    const visible = ((chRes.data as Channel[]) ?? []).filter((c) => c.kind === "team" || mine.has(c.id));
+    setChannels(visible);
   }
   async function loadDirectory() {
     const { data } = await supabase.from("profiles").select("id, full_name, avatar_url").order("full_name");
@@ -65,7 +75,7 @@ function ChatPage() {
     setStaff(list.filter((p) => p.id !== user?.id));
     setProfileById(Object.fromEntries(list.map((p) => [p.id, p])));
   }
-  useEffect(() => { loadChannels(); loadDirectory(); }, []);
+  useEffect(() => { loadChannels(); loadDirectory(); }, [user?.id]);
 
   // ---- who's on the other side of each DM (so the sidebar can show a
   // real name instead of the generic "Direct message" label) -------------
