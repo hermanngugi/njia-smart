@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Users, ClipboardCheck, Receipt, AlertTriangle, CheckCircle2, ListTodo, CalendarClock, UserCheck } from "lucide-react";
+import { Users, ClipboardCheck, Receipt, AlertTriangle, CheckCircle2, ListTodo, CalendarClock, UserCheck, Headset } from "lucide-react";
 import { formatDate, daysUntil } from "@/lib/format";
 import { useAuth } from "@/lib/auth";
 import {
@@ -24,6 +24,70 @@ function Kpi({ icon: Icon, label, value, sub, tone, to }: any) {
     </div>
   );
   return to ? <Link to={to}>{content}</Link> : content;
+}
+
+// ICT Service Desk alert card — shown only to the ICT service-desk team
+// (Amos, Herman, ...) and Director/Admin, so new tickets are seen straight
+// away. Updates live as tickets are raised.
+function IctDeskCard() {
+  const { user, access } = useAuth();
+  const [isTeam, setIsTeam] = useState(false);
+  const [open, setOpen] = useState<any[]>([]);
+  const fullAccess = access("ict_service_desk") === "full";
+
+  async function load() {
+    if (!user) return;
+    const [team, tickets] = await Promise.all([
+      supabase.from("ict_service_desk_team").select("user_id").eq("user_id", user.id).maybeSingle(),
+      supabase.from("ict_tickets").select("id, ticket_number, title, priority, status, assigned_to, created_at")
+        .not("status", "in", "(Resolved,Closed)").order("created_at", { ascending: false }),
+    ]);
+    setIsTeam(!!team.data);
+    setOpen((tickets.data as any[]) ?? []);
+  }
+  useEffect(() => { load(); }, [user?.id]);
+  useEffect(() => {
+    const ch = supabase.channel("dash-ict-tickets")
+      .on("postgres_changes", { event: "*", schema: "public", table: "ict_tickets" }, () => load())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [user?.id]);
+
+  if (!isTeam && !fullAccess) return null;
+
+  const critical = open.filter((t) => t.priority === "Critical").length;
+  const mine = open.filter((t) => t.assigned_to === user?.id).length;
+  const unassigned = open.filter((t) => !t.assigned_to).length;
+  const newest = open.slice(0, 5);
+
+  return (
+    <div className={`bg-card border rounded-lg p-4 ${critical > 0 ? "border-destructive/60" : ""}`}>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="font-semibold inline-flex items-center gap-1.5"><Headset className="h-4 w-4" /> ICT Service Desk</h2>
+        <Link to="/ict-service-desk" className="text-xs text-primary hover:underline">Open service desk →</Link>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 text-center">
+        <div><div className="text-2xl font-bold">{open.length}</div><div className="text-xs text-muted-foreground">Open tickets</div></div>
+        <div><div className={`text-2xl font-bold ${critical > 0 ? "text-destructive" : ""}`}>{critical}</div><div className="text-xs text-muted-foreground">Critical</div></div>
+        <div><div className="text-2xl font-bold">{unassigned}</div><div className="text-xs text-muted-foreground">Unassigned</div></div>
+        <div><div className="text-2xl font-bold">{mine}</div><div className="text-xs text-muted-foreground">Assigned to me</div></div>
+      </div>
+      {newest.length === 0 ? (
+        <div className="text-sm text-muted-foreground">No open tickets.</div>
+      ) : (
+        <ul className="divide-y text-sm">
+          {newest.map((t) => (
+            <li key={t.id} className="py-1.5 flex items-center justify-between gap-2">
+              <Link to="/ict-service-desk" className="truncate hover:underline">
+                <span className="text-xs text-muted-foreground mr-1.5">{t.ticket_number}</span>{t.title}
+              </Link>
+              <span className={`text-xs shrink-0 ${t.priority === "Critical" ? "text-destructive font-medium" : "text-muted-foreground"}`}>{t.priority ?? "—"}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 function Dashboard() {
@@ -140,6 +204,8 @@ function Dashboard() {
         <Kpi icon={ClipboardCheck} label="Staff" value={stats.staff} to="/team" />
         <Kpi icon={ListTodo} label="My Open Items" value={myOpenCount} tone="text-accent" />
       </div>
+
+      <IctDeskCard />
 
       {/* My day — what this person specifically needs to look at */}
       <div className="grid gap-4 lg:grid-cols-2">

@@ -75,6 +75,10 @@ function StatCard({ icon: Icon, label, value }: { icon: any; label: string; valu
 function IctServiceDesk() {
   const { user, access, canCreate } = useAuth();
   const fullAccess = access("ict_service_desk") === "full";
+  // ICT team members (Amos, Herman, ...) work the desk: they see and update
+  // every ticket. Assets + deleting tickets stay Director/Admin only.
+  const [isIctTeam, setIsIctTeam] = useState(false);
+  const canManageTickets = fullAccess || isIctTeam;
   const canRaiseTicket = canCreate("ict_service_desk");
 
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -98,14 +102,15 @@ function IctServiceDesk() {
   // plain select gives each viewer exactly the counts/rows they should see.
   async function load() {
     setLoading(true);
-    const [ticketsRes, openRes, criticalRes, staffRes, assetsRes] = await Promise.all([
+    const [ticketsRes, openRes, criticalRes, staffRes, assetsRes, teamRes] = await Promise.all([
       supabase.from("ict_tickets").select("*").order("created_at", { ascending: false }),
       supabase.from("ict_tickets").select("id", { count: "exact", head: true }).not("status", "in", "(Resolved,Closed)"),
       supabase.from("ict_tickets").select("id", { count: "exact", head: true }).eq("priority", "Critical"),
-      fullAccess ? supabase.from("profiles").select("id, full_name").order("full_name") : Promise.resolve({ data: [], error: null }),
+      supabase.from("profiles").select("id, full_name").order("full_name"),
       // ict_assets is RLS-restricted to Director/Admin; this simply returns
       // nothing for everyone else instead of erroring.
       fullAccess ? supabase.from("ict_assets").select("*").order("name") : Promise.resolve({ data: [], error: null }),
+      supabase.from("ict_service_desk_team").select("user_id"),
     ]);
     if (ticketsRes.error) toast.error(ticketsRes.error.message);
     if (assetsRes.error) toast.error(assetsRes.error.message);
@@ -114,17 +119,30 @@ function IctServiceDesk() {
     setCriticalCount(criticalRes.count ?? 0);
     const directory = (staffRes.data as any[]) ?? [];
     setAllStaff(directory);
-    // Ticket assignee list is limited to the currently-active ICT staff
-    // (Amos, Herman) rather than the whole directory. Matched by name for
-    // now — swap this for a dedicated role/tag once more ICT staff are added.
-    const ictNames = ["amos", "herman"];
-    setStaff(directory.filter((p) => ictNames.some((n) => (p.full_name ?? "").toLowerCase().includes(n))));
+    // Ticket assignees are the ICT service-desk team (ict_service_desk_team
+    // table). Falls back to matching Amos/Herman by name if it's still empty.
+    const teamIds = new Set(((teamRes.data as any[]) ?? []).map((t) => t.user_id));
+    setIsIctTeam(!!user && teamIds.has(user.id));
+    setStaff(
+      teamIds.size > 0
+        ? directory.filter((p) => teamIds.has(p.id))
+        : directory.filter((p) => ["amos", "herman"].some((n) => (p.full_name ?? "").toLowerCase().includes(n))),
+    );
     const assetRows = (assetsRes.data as Asset[]) ?? [];
     setAssets(assetRows);
     setAssetTotalQty(assetRows.reduce((sum, a) => sum + (a.quantity ?? 0), 0));
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
+
+  // Live refresh: a newly raised or updated ticket shows up without a reload.
+  useEffect(() => {
+    const ch = supabase
+      .channel("ict-desk-tickets")
+      .on("postgres_changes", { event: "*", schema: "public", table: "ict_tickets" }, () => load())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
 
   // Only full-access roles (Director/Admin) hit this — the RLS "update"
   // policy on ict_tickets enforces the same rule server-side regardless.
@@ -234,7 +252,7 @@ function IctServiceDesk() {
 
       <div className="bg-card border rounded-lg overflow-hidden">
         <div className="px-4 py-3 border-b text-sm font-medium">
-          {fullAccess ? "All tickets" : "Your tickets"}
+          {canManageTickets ? "All tickets" : "Your tickets"}
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -244,14 +262,14 @@ function IctServiceDesk() {
                 <th>Category</th>
                 <th>Priority</th>
                 <th>Status</th>
-                {fullAccess && <th>Assignee</th>}
+                {canManageTickets && <th>Assignee</th>}
                 <th>Raised</th>
                 {fullAccess && <th></th>}
               </tr>
             </thead>
             <tbody>
               {!loading && tickets.length === 0 && (
-                <tr><td colSpan={fullAccess ? 7 : 5} className="py-10 text-center text-muted-foreground">No tickets yet.</td></tr>
+                <tr><td colSpan={fullAccess ? 7 : canManageTickets ? 6 : 5} className="py-10 text-center text-muted-foreground">No tickets yet.</td></tr>
               )}
               {tickets.map((t) => (
                 <tr key={t.id} className="border-b last:border-0 hover:bg-muted/30">
@@ -262,7 +280,7 @@ function IctServiceDesk() {
                   <td className="text-xs text-muted-foreground">{t.category ?? "—"}</td>
                   <td><span className={`text-xs px-2 py-0.5 rounded ${PRIORITY_COLORS[t.priority ?? ""] ?? "bg-muted text-muted-foreground"}`}>{t.priority ?? "—"}</span></td>
                   <td>
-                    {fullAccess ? (
+                    {canManageTickets ? (
                       <select
                         value={t.status}
                         onChange={(e) => updateTicket(t.id, { status: e.target.value })}
@@ -274,7 +292,7 @@ function IctServiceDesk() {
                       <span className={`text-xs px-2 py-0.5 rounded ${STATUS_COLORS[t.status] ?? "bg-muted text-muted-foreground"}`}>{t.status}</span>
                     )}
                   </td>
-                  {fullAccess && (
+                  {canManageTickets && (
                     <td>
                       <select
                         value={t.assigned_to ?? ""}
