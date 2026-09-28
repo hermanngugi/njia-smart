@@ -772,6 +772,7 @@ export type Database = {
       }
       invoices: {
         Row: {
+          paid_at: string | null
           amount_paid: number
           client_id: string
           created_at: string
@@ -791,6 +792,7 @@ export type Database = {
           vat_rate: number
         }
         Insert: {
+          paid_at?: string | null
           amount_paid?: number
           client_id: string
           created_at?: string
@@ -810,6 +812,7 @@ export type Database = {
           vat_rate?: number
         }
         Update: {
+          paid_at?: string | null
           amount_paid?: number
           client_id?: string
           created_at?: string
@@ -995,6 +998,8 @@ export type Database = {
       }
       tasks: {
         Row: {
+          completed_at: string | null
+          completed_by: string | null
           assigned_to: string | null
           client_id: string | null
           created_at: string
@@ -1010,6 +1015,8 @@ export type Database = {
           title: string
         }
         Insert: {
+          completed_at?: string | null
+          completed_by?: string | null
           assigned_to?: string | null
           client_id?: string | null
           created_at?: string
@@ -1025,6 +1032,8 @@ export type Database = {
           title: string
         }
         Update: {
+          completed_at?: string | null
+          completed_by?: string | null
           assigned_to?: string | null
           client_id?: string | null
           created_at?: string
@@ -1058,6 +1067,7 @@ export type Database = {
       }
       tax_return_assignees: {
         Row: {
+          assigned_by: string | null
           created_at: string
           id: string
           role: string | null
@@ -1065,6 +1075,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          assigned_by?: string | null
           created_at?: string
           id?: string
           role?: string | null
@@ -1072,6 +1083,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          assigned_by?: string | null
           created_at?: string
           id?: string
           role?: string | null
@@ -1082,6 +1094,10 @@ export type Database = {
       }
       tax_returns: {
         Row: {
+          filed_at: string | null
+          filed_by: string | null
+          assigned_at: string | null
+          assigned_by: string | null
           ack_file_path: string | null
           assigned_to: string | null
           client_id: string
@@ -1095,6 +1111,10 @@ export type Database = {
           status: Database["public"]["Enums"]["tax_return_status"]
         }
         Insert: {
+          filed_at?: string | null
+          filed_by?: string | null
+          assigned_at?: string | null
+          assigned_by?: string | null
           ack_file_path?: string | null
           assigned_to?: string | null
           client_id: string
@@ -1108,6 +1128,10 @@ export type Database = {
           status?: Database["public"]["Enums"]["tax_return_status"]
         }
         Update: {
+          filed_at?: string | null
+          filed_by?: string | null
+          assigned_at?: string | null
+          assigned_by?: string | null
           ack_file_path?: string | null
           assigned_to?: string | null
           client_id?: string
