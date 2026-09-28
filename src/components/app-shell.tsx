@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, ClipboardCheck, Receipt, Lightbulb,
   ListTodo, Megaphone, FolderOpen, CalendarDays, UserCog, Settings,
   LogOut, Menu, History, Wallet, Monitor, Landmark, Wallet2, Briefcase,
-  Contact, MessageSquare, Headset,
+  Contact, MessageSquare, Headset, Link2,
 } from "lucide-react";
 import { useState } from "react";
 import { NotificationBell } from "./notification-bell";
@@ -29,6 +29,7 @@ const NAV = [
   { to: "/documents", label: "Documents", icon: FolderOpen },
   { to: "/calendar", label: "Calendar", icon: CalendarDays },
   { to: "/announcements", label: "Announcements", icon: Megaphone },
+  { to: "/quick-links", label: "Quick Links", icon: Link2 },
   { to: "/hr", label: "HR & Employees", icon: Contact },
 ];
 
