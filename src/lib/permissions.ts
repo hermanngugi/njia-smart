@@ -197,6 +197,17 @@ export function canDelete(
   return record.createdBy === currentUserId;
 }
 
+/**
+ * HR managers can add/edit employee personal details, attach payslips and
+ * other employee documents. Mirrors public.is_hr_manager() in the database —
+ * keep the two in sync.
+ */
+export const HR_MANAGER_ROLES: AppRole[] = ["director", "admin", "accountant"];
+
+export function isHrManager(roles: AppRole[]): boolean {
+  return roles.some((r) => HR_MANAGER_ROLES.includes(r));
+}
+
 /** Accountant is the primary leave approver, assisted by the director. */
 export const LEAVE_APPROVAL_ROLES: AppRole[] = ["accountant", "director"];
 
