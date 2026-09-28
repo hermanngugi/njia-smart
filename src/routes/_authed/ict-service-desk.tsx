@@ -18,7 +18,7 @@ export const Route = createFileRoute("/_authed/ict-service-desk")({
 const CATEGORIES = ["Hardware", "Software", "Network", "Access/Account", "Other"];
 const PRIORITIES = ["Low", "Medium", "High", "Critical"];
 const STATUSES = ["New", "In Progress", "On Hold", "Resolved", "Closed"];
-const EMPTY_FORM = { title: "", description: "", category: CATEGORIES[0], priority: "Medium" };
+const EMPTY_FORM = { title: "", description: "", category: CATEGORIES[0], priority: "Medium", assigned_to: "" };
 const EMPTY_ASSET_FORM = { id: "", name: "", description: "", quantity: "1", unit_cost: "", purchase_date: "", assigned_to: "" };
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -214,6 +214,7 @@ function IctServiceDesk() {
         description: form.description.trim() || null,
         category: form.category,
         priority: form.priority,
+        assigned_to: form.assigned_to || null,
         reported_by: user.id,
       })
       .select("ticket_number")
@@ -262,14 +263,14 @@ function IctServiceDesk() {
                 <th>Category</th>
                 <th>Priority</th>
                 <th>Status</th>
-                {canManageTickets && <th>Assignee</th>}
+                <th>Assignee</th>
                 <th>Raised</th>
                 {fullAccess && <th></th>}
               </tr>
             </thead>
             <tbody>
               {!loading && tickets.length === 0 && (
-                <tr><td colSpan={fullAccess ? 7 : canManageTickets ? 6 : 5} className="py-10 text-center text-muted-foreground">No tickets yet.</td></tr>
+                <tr><td colSpan={fullAccess ? 7 : 6} className="py-10 text-center text-muted-foreground">No tickets yet.</td></tr>
               )}
               {tickets.map((t) => (
                 <tr key={t.id} className="border-b last:border-0 hover:bg-muted/30">
@@ -292,8 +293,8 @@ function IctServiceDesk() {
                       <span className={`text-xs px-2 py-0.5 rounded ${STATUS_COLORS[t.status] ?? "bg-muted text-muted-foreground"}`}>{t.status}</span>
                     )}
                   </td>
-                  {canManageTickets && (
-                    <td>
+                  <td>
+                    {canManageTickets ? (
                       <select
                         value={t.assigned_to ?? ""}
                         onChange={(e) => updateTicket(t.id, { assigned_to: e.target.value || null })}
@@ -302,8 +303,10 @@ function IctServiceDesk() {
                         <option value="">Unassigned</option>
                         {staff.map((s) => <option key={s.id} value={s.id}>{s.full_name ?? "Unnamed"}</option>)}
                       </select>
-                    </td>
-                  )}
+                    ) : (
+                      <span className="text-xs">{allStaff.find((p) => p.id === t.assigned_to)?.full_name ?? "Unassigned"}</span>
+                    )}
+                  </td>
                   <td className="text-xs text-muted-foreground">{new Date(t.created_at).toLocaleDateString("en-KE", { day: "2-digit", month: "short", year: "numeric" })}</td>
                   {fullAccess && (
                     <td className="pr-2 text-right">
@@ -399,6 +402,17 @@ function IctServiceDesk() {
               </select>
               <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} className="h-9 px-3 rounded-md border bg-background text-sm">
                 {PRIORITIES.map((p) => <option key={p}>{p}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Assign to (ICT)</label>
+              <select
+                value={form.assigned_to}
+                onChange={(e) => setForm({ ...form, assigned_to: e.target.value })}
+                className="w-full h-9 px-3 rounded-md border bg-background text-sm mt-1"
+              >
+                <option value="">Any ICT team member</option>
+                {staff.map((s) => <option key={s.id} value={s.id}>{s.full_name ?? "Unnamed"}</option>)}
               </select>
             </div>
             <button disabled={saving} className="w-full h-10 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50">
