@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
-import { Building2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -136,8 +135,8 @@ function LoginPage() {
     <div className="min-h-screen flex bg-background">
       <div className="hidden lg:flex flex-col justify-between w-1/2 bg-sidebar text-sidebar-foreground p-12">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-lg bg-accent flex items-center justify-center">
-            <Building2 className="h-5 w-5 text-accent-foreground" />
+          <div className="h-12 w-12 rounded-lg bg-white flex items-center justify-center overflow-hidden">
+            <img src="/logo.png" alt="G.K Nahashon & Company logo" className="h-full w-full object-contain" />
           </div>
           <div>
             <div className="font-bold">G.K Nahashon</div>
@@ -146,7 +145,7 @@ function LoginPage() {
         </div>
         <div>
           <h2 className="text-3xl font-bold leading-tight">
-            Intelligent office management for accounting, audit, tax & advisory firms.
+            Reliable. Credible. Consultants
           </h2>
           <p className="mt-4 text-sidebar-foreground/70">
             Centralize clients, deadlines, audits, tax filings, documents and team communication —
@@ -159,6 +158,7 @@ function LoginPage() {
       <div className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
           <div className="lg:hidden mb-8 text-center">
+            <img src="/logo.png" alt="G.K Nahashon & Company logo" className="h-20 w-20 mx-auto mb-3 object-contain" />
             <div className="font-bold text-lg">G.K Nahashon & Company</div>
             <div className="text-xs text-muted-foreground">Office Management Platform</div>
           </div>
