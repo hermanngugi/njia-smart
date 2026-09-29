@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { ClientAssignments } from "@/components/client-assignments";
 import { ObligationContacts } from "@/components/obligation-contacts";
+import { LastUpdated } from "@/components/last-updated";
 
 export const Route = createFileRoute("/_authed/clients/$id")({ component: ClientDetail });
 
@@ -39,17 +40,19 @@ function ClientDetail() {
   const [pwdValue, setPwdValue] = useState("");
   const [pwdBusy, setPwdBusy] = useState(false);
   const [updaterName, setUpdaterName] = useState<string | null>(null);
+  const [recordUpdaterName, setRecordUpdaterName] = useState<string | null>(null);
 
   async function load() {
     const { data } = await supabase.from("clients").select("*").eq("id", id).maybeSingle();
     setClient(data);
     const updaterId = (data as any)?.portal_password_updated_by;
-    if (updaterId) {
-      const { data: prof } = await supabase.from("profiles").select("full_name").eq("id", updaterId).maybeSingle();
-      setUpdaterName((prof as any)?.full_name ?? null);
-    } else {
-      setUpdaterName(null);
-    }
+    const recordUpdaterId = (data as any)?.updated_by;
+    const [prof, recordProf] = await Promise.all([
+      updaterId ? supabase.from("profiles").select("full_name").eq("id", updaterId).maybeSingle() : Promise.resolve({ data: null }),
+      recordUpdaterId ? supabase.from("profiles").select("full_name").eq("id", recordUpdaterId).maybeSingle() : Promise.resolve({ data: null }),
+    ]);
+    setUpdaterName((prof.data as any)?.full_name ?? null);
+    setRecordUpdaterName((recordProf.data as any)?.full_name ?? null);
     const [tax, eng, adv, docs, tasks, contacts, pols, obl] = await Promise.all([
       supabase.from("tax_returns").select("*").eq("client_id", id).order("due_date"),
       supabase.from("engagements").select("*").eq("client_id", id).order("created_at", { ascending: false }),
@@ -227,6 +230,7 @@ function ClientDetail() {
               {client.industry && <span>· {client.industry}</span>}
               {client.engagement_type && <span>· {client.engagement_type}</span>}
             </div>
+            <LastUpdated at={(client as any).updated_at} byName={recordUpdaterName} className="block mt-1" />
           </div>
           <div className="flex items-center gap-2">
             <button
