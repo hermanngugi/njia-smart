@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Plus, X, Trash2, Pencil, Upload, FileText, Eye, Download, ChevronDown, ChevronRight, ShieldCheck, Lock, CheckCircle2 } from "lucide-react";
-import { formatDate, STATUS_COLORS, statusLabel } from "@/lib/format";
+import { formatDate, formatDateTime, STATUS_COLORS, statusLabel } from "@/lib/format";
 import { ClientAssignments } from "@/components/client-assignments";
 import { ModuleTabBar, ClientsRollupTab, BillingTab, DocumentsTab, type ClientRollupRow } from "@/components/module-extra-tabs";
 import { useAuth } from "@/lib/auth";
@@ -317,6 +317,7 @@ function AdvisoryPage() {
                 <span>{done}/{ms.length} steps · {verified} verified</span>
                 <span>{r.start_date ? `${formatDate(r.start_date)} → ` : ""}{formatDate(r.due_date)}</span>
               </div>
+              {r.updated_at && <div className="mt-1 text-[10px] text-muted-foreground">Last updated {formatDateTime(r.updated_at)}</div>}
               <div className="mt-1 h-1.5 bg-muted rounded-full overflow-hidden"><div className="h-full bg-accent" style={{ width: `${pct}%` }} /></div>
               {r.client_id && (
                 <div className="mt-2 flex items-center gap-2 text-xs">

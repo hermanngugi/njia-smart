@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Plus, X, Pencil, Trash2, MessageSquare, Send } from "lucide-react";
 import { formatDate, formatDateTime, daysUntil, STATUS_COLORS } from "@/lib/format";
 import { useAuth } from "@/lib/auth";
+import { LastUpdated } from "@/components/last-updated";
 
 export const Route = createFileRoute("/_authed/tasks")({ component: TasksPage });
 
@@ -131,8 +132,10 @@ function TasksPage() {
                       <select value={t.status} onChange={e=>setStatus(t.id, e.target.value)} className={`h-7 px-2 rounded text-xs border bg-background capitalize ${STATUS_COLORS[t.status]}`}>
                         {["todo","in_progress","blocked","done"].map(s=><option key={s} value={s}>{s.replace(/_/g," ")}</option>)}
                       </select>
-                      {t.status === "done" && t.completed_at && (
+                      {t.status === "done" && t.completed_at ? (
                         <div className="text-[10px] text-muted-foreground mt-0.5 whitespace-nowrap">Done {formatDateTime(t.completed_at)}</div>
+                      ) : (
+                        <LastUpdated at={t.updated_at} byName={t.updated_by ? staff.find((s: any) => s.id === t.updated_by)?.full_name : null} className="block mt-0.5 text-[10px] whitespace-nowrap" />
                       )}
                     </td>
                     <td className="pr-2 text-right space-x-1 whitespace-nowrap">

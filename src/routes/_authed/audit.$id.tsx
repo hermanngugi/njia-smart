@@ -153,6 +153,7 @@ function AuditDetail() {
           <div>
             <h1 className="text-2xl font-bold">{e.title}</h1>
             <div className="text-sm text-muted-foreground">{e.clients?.company_name}</div>
+            {e.updated_at && <div className="text-xs text-muted-foreground mt-1">Last updated {formatDateTime(e.updated_at)}</div>}
           </div>
           <span className={`h-fit text-xs px-2 py-1 rounded-full capitalize ${STATUS_COLORS[e.status]}`}>{statusLabel(e.status)}</span>
         </div>

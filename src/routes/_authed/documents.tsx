@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Upload, Download, Trash2, FileText, Eye, X } from "lucide-react";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatDateTime } from "@/lib/format";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/_authed/documents")({ component: DocsPage });
@@ -88,7 +88,12 @@ function DocsPage() {
                   <td className="py-2 px-3 inline-flex items-center gap-2"><FileText className="h-4 w-4 text-muted-foreground" />{r.title}</td>
                   <td>{r.clients?.company_name}</td>
                   <td>v{r.version}</td>
-                  <td className="text-xs text-muted-foreground">{formatDate(r.created_at)}</td>
+                  <td className="text-xs text-muted-foreground">
+                    {formatDate(r.created_at)}
+                    {r.updated_at && new Date(r.updated_at).getTime() - new Date(r.created_at).getTime() > 60000 && (
+                      <div className="text-[10px]">Edited {formatDateTime(r.updated_at)}</div>
+                    )}
+                  </td>
                   <td className="text-right pr-3 space-x-2 whitespace-nowrap">
                     <button onClick={()=>view(r.file_path, r.title)} className="text-primary text-xs inline-flex items-center gap-1"><Eye className="h-3 w-3" />View</button>
                     <button onClick={()=>download(r.file_path)} className="text-primary text-xs inline-flex items-center gap-1"><Download className="h-3 w-3" />Download</button>
