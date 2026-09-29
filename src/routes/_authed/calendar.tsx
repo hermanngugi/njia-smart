@@ -63,7 +63,7 @@ function CalendarPage() {
         return ed.getDate() === d.getDate() && ed.getMonth() === d.getMonth();
       }
       return false;
-    }).map(e => ({ kind: "custom" as const, id: e.id, title: e.title, type: e.type, raw: e }));
+    }).map(e => ({ kind: "custom" as const, id: e.id, title: e.title, type: e.type, raw: e, sharedWithYou: e.created_by && e.created_by !== user?.id, isTeam: e.visibility === "team" }));
     const tax = taxRows.filter(t => t.due_date === dStr).map(t => ({
       kind: "tax" as const, id: t.id, title: `${t.return_type.toUpperCase()} · ${t.clients?.company_name ?? ""}`, type: "deadline",
     }));
@@ -73,11 +73,11 @@ function CalendarPage() {
   function openNew(d: Date) {
     setDialog({ mode: "new", data: {
       title: "", type: "reminder", event_date: d.toISOString().slice(0, 10),
-      event_time: "", recurrence: "once", client_id: "", assigned_to: "", notes: "",
+      event_time: "", recurrence: "once", client_id: "", assigned_to: "", notes: "", visibility: "private",
     }});
   }
   function openEdit(ev: any) {
-    setDialog({ mode: "edit", data: { ...ev, event_time: ev.event_time ?? "", client_id: ev.client_id ?? "", assigned_to: ev.assigned_to ?? "", notes: ev.notes ?? "" } });
+    setDialog({ mode: "edit", data: { ...ev, event_time: ev.event_time ?? "", client_id: ev.client_id ?? "", assigned_to: ev.assigned_to ?? "", notes: ev.notes ?? "", visibility: ev.visibility ?? "private" } });
   }
   async function save() {
     if (!dialog) return;
@@ -86,7 +86,7 @@ function CalendarPage() {
       title: d.title, type: d.type, event_date: d.event_date,
       event_time: d.event_time || null, recurrence: d.recurrence,
       client_id: d.client_id || null, assigned_to: d.assigned_to || null,
-      notes: d.notes || null,
+      notes: d.notes || null, visibility: d.visibility === "team" ? "team" : "private",
     };
     if (!payload.title || !payload.event_date) { toast.error("Title and date required"); return; }
     let err;
@@ -117,7 +117,7 @@ function CalendarPage() {
       <div className="flex justify-between items-center flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">Calendar</h1>
-          <p className="text-sm text-muted-foreground">Tasks, reminders, deadlines and meetings — click any day to add.</p>
+          <p className="text-sm text-muted-foreground">Your personal calendar — events you created or were assigned to. Click any day to add.</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => openNew(new Date())} className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs inline-flex items-center gap-1"><Plus className="h-3 w-3" /> New event</button>
@@ -151,9 +151,9 @@ function CalendarPage() {
                       key={idx}
                       onClick={ev => { ev.stopPropagation(); if (e.kind === "custom") openEdit(e.raw); }}
                       className={`px-1.5 py-0.5 rounded text-[10px] truncate ${typeCls(e.type)}`}
-                      title={e.title}
+                      title={e.kind === "custom" && e.sharedWithYou ? (e.isTeam ? `${e.title} · team event` : `${e.title} · assigned to you`) : e.title}
                     >
-                      {e.title}
+                      {e.kind === "custom" && e.sharedWithYou ? (e.isTeam ? "👥 " : "👤 ") : ""}{e.title}
                     </div>
                   ))}
                   {evs.length > 3 && <div className="text-[10px] text-muted-foreground">+{evs.length - 3} more</div>}
@@ -177,6 +177,13 @@ function CalendarPage() {
                 <option value="once">One-time</option>
                 <option value="monthly">Monthly</option>
                 <option value="annual">Annually</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium">Who can see this</label>
+              <select value={dialog.data.visibility} onChange={e => setDialog({ ...dialog, data: { ...dialog.data, visibility: e.target.value } })} className="mt-1 w-full h-9 px-3 rounded-md border bg-background text-sm">
+                <option value="private">Only me (and anyone I assign it to)</option>
+                <option value="team">Everyone on staff</option>
               </select>
             </div>
             <div className="grid grid-cols-2 gap-2">
