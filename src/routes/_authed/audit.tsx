@@ -13,9 +13,8 @@ import { useAuth } from "@/lib/auth";
 export const Route = createFileRoute("/_authed/audit")({ component: AuditRoute });
 
 // /audit/$id (an engagement workspace) is a child route of /audit. Without an
-// <Outlet /> the parent keeps rendering this list and the workspace (planning,
-// risk register, review and sign-off panels) never opens. Show the child
-// whenever one is matched and the list otherwise.
+// <Outlet /> the parent keeps rendering this list and the workspace never
+// opens. Show the child whenever one is matched and the list otherwise.
 function AuditRoute() {
   const childMatches = useChildMatches();
   if (childMatches.length > 0) return <Outlet />;
@@ -32,6 +31,8 @@ function AuditPage() {
   const [newClientName, setNewClientName] = useState("");
   const [editRow, setEditRow] = useState<any | null>(null);
   const [invoiceFor, setInvoiceFor] = useState<any | null>(null);
+  // Checklist progress per engagement: { done, total } of audit procedures.
+  const [checklist, setChecklist] = useState<Record<string, { done: number; total: number }>>({});
 
   async function load() {
     const [e, c] = await Promise.all([
@@ -39,6 +40,21 @@ function AuditPage() {
       supabase.from("clients").select("id, company_name").order("company_name"),
     ]);
     setRows(e.data ?? []); setClients(c.data ?? []);
+    // Real checklist progress (ignored quietly if the audit tables are not set up yet).
+    const ids = (e.data ?? []).map((r: any) => r.id);
+    if (ids.length) {
+      const { data: procs, error: procErr } = await (supabase as any)
+        .from("audit_engagement_procedures").select("engagement_id, status").in("engagement_id", ids);
+      if (!procErr) {
+        const next: Record<string, { done: number; total: number }> = {};
+        for (const p of procs ?? []) {
+          const row = (next[p.engagement_id] ||= { done: 0, total: 0 });
+          row.total += 1;
+          if (p.status === "completed" || p.status === "not_applicable") row.done += 1;
+        }
+        setChecklist(next);
+      }
+    }
   }
   useEffect(() => { load(); }, []);
 
@@ -196,7 +212,11 @@ function AuditPage() {
                 <div className="h-full bg-primary" style={{ width: `${r.completion_pct}%` }} />
               </div>
               <div className="mt-2 flex justify-between text-xs text-muted-foreground">
-                <span>Planning → Working papers → Review → Sign-off</span>
+                <span>
+                  {checklist[r.id]
+                    ? `Checklist: ${checklist[r.id].done} of ${checklist[r.id].total} steps done`
+                    : "Checklist not set up yet — open to get started"}
+                </span>
                 <span>{r.completion_pct}%</span>
               </div>
             </Link>
@@ -266,9 +286,8 @@ function AuditPage() {
                 <select value={editRow.status} onChange={e=>setEditRow({...editRow, status:e.target.value})} className="mt-1 w-full h-9 px-3 rounded-md border bg-background text-sm">
                   <option value="not_started">Not started</option>
                   <option value="in_progress">In progress</option>
-                  <option value="review">Review</option>
+                  <option value="under_review">Under review</option>
                   <option value="completed">Completed</option>
-                  <option value="on_hold">On hold</option>
                 </select>
               </div>
               <div><label className="text-xs font-medium">Progress %</label><input type="number" min={0} max={100} value={editRow.completion_pct ?? 0} onChange={e=>setEditRow({...editRow, completion_pct:e.target.value})} className="mt-1 w-full h-9 px-3 rounded-md border bg-background text-sm" /></div>
