@@ -190,7 +190,7 @@ function Dashboard() {
   const myOpenCount = myTasks.length + myFilings.length;
 
   return (
-    <div className="space-y-6">
+    <div className="dashboard-page-enter space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <p className="text-sm text-muted-foreground mt-1">{summary}</p>
@@ -198,7 +198,7 @@ function Dashboard() {
 
       {/* Director: navigation-first command centre replaces the generic KPI strip */}
       {isDirector ? <DirectorCommandCentre /> : (
-      <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+      <div className="dashboard-kpi-grid grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
         <Kpi icon={Users} label="Clients" value={stats.clients} to="/clients" />
         <Kpi icon={Receipt} label="Pending Tax" value={stats.pending} tone="text-primary" to="/tax" />
         <Kpi icon={AlertTriangle} label="Overdue" value={stats.overdue} tone="text-destructive" to="/tasks" />
