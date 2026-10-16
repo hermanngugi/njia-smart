@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Upload, Download, Trash2, FileText, Eye, X } from "lucide-react";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { useAuth } from "@/lib/auth";
+import { useLiveRefresh } from "@/hooks/use-live-refresh";
 
 export const Route = createFileRoute("/_authed/documents")({ component: DocsPage });
 
@@ -24,7 +25,8 @@ function DocsPage() {
     ]);
     setRows(d.data ?? []); setClients(c.data ?? []);
   }
-  useEffect(()=>{ load(); }, []);
+  useEffect(()=>{ void load(); }, []);
+  useLiveRefresh(["documents", "clients"], load);
 
   async function upload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
