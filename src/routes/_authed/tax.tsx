@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useLiveRefresh } from "@/hooks/use-live-refresh";
 import { toast } from "sonner";
-import { AlertTriangle, Clock, UserX, LayoutGrid, Check, ChevronDown, ChevronUp, Download } from "lucide-react";
+import { AlertTriangle, Clock, UserX, LayoutGrid, Check, ChevronDown, ChevronUp, Download, Upload, FileText } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { CompletionInvoiceDialog } from "@/components/completion-invoice-dialog";
 import { daysUntil, periodsOverdue, formatDate, formatDateTime } from "@/lib/format";
@@ -47,6 +47,9 @@ function TaxPage() {
   const [staff, setStaff] = useState<any[]>([]);
   const [obligations, setObligations] = useState<any[]>([]);
   const [collabByReturn, setCollabByReturn] = useState<Map<string, string[]>>(new Map());
+  const [documentsByReturn, setDocumentsByReturn] = useState<Map<string, any[]>>(new Map());
+  const [invoicesById, setInvoicesById] = useState<Map<string, any>>(new Map());
+  const [uploadingReceipt, setUploadingReceipt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyCell, setBusyCell] = useState<string | null>(null);
   const [invoiceFor, setInvoiceFor] = useState<{ id: string; clientName?: string | null; description: string } | null>(null);
@@ -76,6 +79,22 @@ function TaxPage() {
     setClients(c.data ?? []);
     setStaff(s.data ?? []);
     setObligations(o as any[]);
+    const invoiceIds = [...new Set((r as any[]).map((row: any) => row.invoice_id).filter(Boolean) as string[])];
+    const invoiceRows = invoiceIds.length
+      ? await fetchAll((a, b) => supabase.from("invoices").select("id, invoice_number, total").in("id", invoiceIds).order("id").range(a, b))
+      : [];
+    setInvoicesById(new Map((invoiceRows as any[]).map((invoice: any) => [invoice.id, invoice])));
+    const returnIds = r.map((row: any) => row.id);
+    const documentRows = returnIds.length
+      ? await fetchAll((a, b) => supabase.from("documents").select("id, client_id, tax_return_id, title, file_path, uploaded_by, created_at").in("tax_return_id", returnIds).order("created_at", { ascending: false }).range(a, b))
+      : [];
+    const docsByReturn = new Map<string, any[]>();
+    (documentRows as any[]).forEach((doc: any) => {
+      if (!doc.tax_return_id) return;
+      if (!docsByReturn.has(doc.tax_return_id)) docsByReturn.set(doc.tax_return_id, []);
+      docsByReturn.get(doc.tax_return_id)!.push(doc);
+    });
+    setDocumentsByReturn(docsByReturn);
     const ca = await fetchAll((a, b) => supabase.from("tax_return_assignees" as any).select("id, tax_return_id, user_id").order("id").range(a, b));
     const cm = new Map<string, string[]>();
     (ca as any[]).forEach((c: any) => { if (!cm.has(c.tax_return_id)) cm.set(c.tax_return_id, []); cm.get(c.tax_return_id)!.push(c.user_id); });
@@ -83,7 +102,7 @@ function TaxPage() {
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
-  useLiveRefresh(["tax_returns", "tax_return_assignees", "client_tax_obligations"], () => load(true));
+  useLiveRefresh(["tax_returns", "tax_return_assignees", "client_tax_obligations", "documents", "invoices"], () => load(true));
 
   const activePolicies = useMemo(() => policies.filter(p => p.active), [policies]);
 
@@ -257,33 +276,23 @@ function TaxPage() {
     }
 
     const columns = [
-      { header: "Tax return ID", value: (row: any) => row.cur?.id },
-      { header: "Client ID", value: (row: any) => row.client.id },
-      { header: "Client name", value: (row: any) => row.client.company_name },
-      { header: "Tax type code", value: (row: any) => row.pol.tax_type },
+      { header: "Client", value: (row: any) => row.client.company_name },
       { header: "Tax type", value: (row: any) => row.pol.label },
-      { header: "Tax cadence", value: (row: any) => row.pol.cadence },
-      { header: "Policy due day", value: (row: any) => row.pol.due_day },
-      { header: "Filing record", value: (row: any) => row.filed ? "Filed" : "Not filed" },
-      { header: "Return status", value: (row: any) => row.cur?.status ?? "not_scheduled" },
-      { header: "Period start", value: (row: any) => row.cur?.period_start },
-      { header: "Period end", value: (row: any) => row.cur?.period_end },
+      { header: "Status", value: (row: any) => row.filed ? "Filed" : "Not filed" },
+      { header: "Period ending", value: (row: any) => row.cur?.period_end },
       { header: "Due date", value: (row: any) => row.cur?.due_date },
-      { header: "Primary assignee", value: (row: any) => row.cur?.assigned_to ? staffMap.get(row.cur.assigned_to) ?? "Unknown" : "" },
-      { header: "Collaborators", value: (row: any) => row.cur ? [...new Set(collabByReturn.get(row.cur.id) ?? [])].map(id => staffMap.get(id) ?? "Unknown").join("; ") : "" },
-      { header: "Assigned team", value: (row: any) => {
+      { header: "Assigned to", value: (row: any) => {
         const ids = row.cur ? [...new Set([row.cur.assigned_to, ...(collabByReturn.get(row.cur.id) ?? [])].filter(Boolean) as string[])] : [];
         return ids.map(id => staffMap.get(id) ?? "Unknown").join("; ");
       } },
-      { header: "Assigned at", value: (row: any) => row.cur?.assigned_at },
-      { header: "Assigned by", value: (row: any) => row.cur?.assigned_by ? staffMap.get(row.cur.assigned_by) ?? "Unknown" : "" },
-      { header: "Filed at", value: (row: any) => row.cur?.filed_at },
-      { header: "Filed by", value: (row: any) => row.cur?.filed_by ? staffMap.get(row.cur.filed_by) ?? "Unknown" : "" },
-      { header: "Invoice ID", value: (row: any) => row.cur?.invoice_id },
-      { header: "Renewed to return ID", value: (row: any) => row.cur?.renewed_to_id },
-      { header: "Notes", value: (row: any) => row.cur?.notes },
-      { header: "Record created at", value: (row: any) => row.cur?.created_at },
-      { header: "Record created by", value: (row: any) => row.cur?.created_by ? staffMap.get(row.cur.created_by) ?? "Unknown" : "" },
+      { header: "Invoice ID", value: (row: any) => {
+        const invoice = row.cur?.invoice_id ? invoicesById.get(row.cur.invoice_id) : null;
+        return invoice?.invoice_number ?? row.cur?.invoice_id ?? "";
+      } },
+      { header: "Invoice amount", value: (row: any) => {
+        const invoice = row.cur?.invoice_id ? invoicesById.get(row.cur.invoice_id) : null;
+        return invoice?.total ?? "";
+      } },
     ];
 
     // Quote every cell and neutralize spreadsheet formula prefixes in user-entered values.
@@ -300,12 +309,46 @@ function TaxPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `tax-filing-record-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `tax-filing-summary-${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(link);
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    toast.success(`Downloaded ${filteredReportRows.length} tax filing record${filteredReportRows.length === 1 ? "" : "s"} as CSV.`);
+    toast.success(`Downloaded ${filteredReportRows.length} tax filing record${filteredReportRows.length === 1 ? "" : "s"} as an 8-column summary CSV.`);
+  }
+
+  async function uploadReceipt(returnId: string, clientId: string, file: File) {
+    setUploadingReceipt(returnId);
+    const { data: { user } } = await supabase.auth.getUser();
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const path = `${clientId}/tax-returns/${returnId}/${Date.now()}-${safeName}`;
+    const upload = await supabase.storage.from("client-documents").upload(path, file);
+    if (upload.error) {
+      toast.error(upload.error.message);
+      setUploadingReceipt(null);
+      return;
+    }
+    const { error } = await supabase.from("documents").insert({
+      client_id: clientId,
+      tax_return_id: returnId,
+      title: file.name,
+      file_path: path,
+      uploaded_by: user?.id ?? null,
+    } as any);
+    if (error) {
+      await supabase.storage.from("client-documents").remove([path]);
+      toast.error(error.message);
+    } else {
+      toast.success("Filing receipt uploaded");
+      await load(true);
+    }
+    setUploadingReceipt(null);
+  }
+
+  async function downloadReceipt(path: string) {
+    const { data, error } = await supabase.storage.from("client-documents").createSignedUrl(path, 60);
+    if (error) toast.error(error.message);
+    else window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   }
 
   async function toggleObligation(clientId: string, taxType: string, next: boolean) {
@@ -322,6 +365,12 @@ function TaxPage() {
   // Mark a filing filed (or reopen it) directly from the Checklist / Overview,
   // without needing to drill into the per-type page first.
   async function markFiled(returnId: string, filed: boolean, skipInvoice = false) {
+    // A filing must have a receipt/proof of submission attached before it can be marked filed.
+    if (filed && !(documentsByReturn.get(returnId)?.length)) {
+      toast.error("Upload the filing receipt in Tax → Filing Record before marking this return as filed.");
+      setTab("Filing Record");
+      return;
+    }
     // A filing can't be marked filed until an invoice exists for it.
     if (filed && !skipInvoice) {
       const r = returns.find((x: any) => x.id === returnId);
@@ -568,17 +617,17 @@ function TaxPage() {
               <ChecklistChip active={reportFilter === "not_filed"} onClick={() => setReportFilter("not_filed")} icon={AlertTriangle} label="Not filed" value={assigneeScopedReportRows.filter(r => !r.filed).length} tone="destructive" />
             </div>
             <button type="button" onClick={downloadReportCsv} disabled={filteredReportRows.length === 0} className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
-              <Download className="h-4 w-4" /> Download CSV ({filteredReportRows.length})
+              <Download className="h-4 w-4" /> Download Summary CSV · 8 columns ({filteredReportRows.length})
             </button>
           </div>
 
           <div className="bg-card border rounded-lg overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-muted/40 text-left text-xs text-muted-foreground border-b">
-                <tr><th className="py-2 px-3">Client</th><th className="py-2 px-3">Tax type</th><th className="py-2 px-3">Status</th><th className="py-2 px-3">Period ending</th><th className="py-2 px-3">Due date</th><th className="py-2 px-3">Assigned to</th><th className="py-2 px-3">Filed on</th></tr>
+                <tr><th className="py-2 px-3">Client</th><th className="py-2 px-3">Tax type</th><th className="py-2 px-3">Status</th><th className="py-2 px-3">Period ending</th><th className="py-2 px-3">Due date</th><th className="py-2 px-3">Assigned to</th><th className="py-2 px-3">Filed on</th><th className="py-2 px-3">Receipt / proof</th></tr>
               </thead>
               <tbody>
-                {filteredReportRows.length === 0 && <tr><td colSpan={7} className="py-8 text-center text-muted-foreground">No obligations match this view.</td></tr>}
+                {filteredReportRows.length === 0 && <tr><td colSpan={8} className="py-8 text-center text-muted-foreground">No obligations match this view.</td></tr>}
                 {filteredReportRows.map(row => (
                   <tr key={row.key} className="border-b last:border-0 hover:bg-muted/20">
                     <td className="py-1.5 px-3 font-medium">{row.client.company_name}</td>
@@ -607,12 +656,27 @@ function TaxPage() {
                         </>
                       ) : "—"}
                     </td>
+                    <td className="py-1.5 px-3 min-w-[220px]">
+                      {row.cur ? (
+                        <div className="space-y-1.5">
+                          {(documentsByReturn.get(row.cur.id) ?? []).map((doc: any) => (
+                            <button key={doc.id} type="button" onClick={() => downloadReceipt(doc.file_path)} className="flex items-center gap-1 text-xs text-primary hover:underline max-w-[240px]" title={doc.title}>
+                              <FileText className="h-3 w-3 shrink-0" /><span className="truncate">{doc.title || "Filing receipt"}</span>
+                            </button>
+                          ))}
+                          <label className={`inline-flex items-center gap-1 text-xs text-primary cursor-pointer hover:underline ${uploadingReceipt === row.cur.id ? "opacity-60" : ""}`}>
+                            <Upload className="h-3 w-3" /> {uploadingReceipt === row.cur.id ? "Uploading…" : (documentsByReturn.get(row.cur.id)?.length ? "Add receipt" : "Upload receipt *")}
+                            <input type="file" className="hidden" disabled={uploadingReceipt === row.cur.id} onChange={e => { const file = e.target.files?.[0]; if (file) uploadReceipt(row.cur.id, row.client.id, file); e.currentTarget.value = ""; }} />
+                          </label>
+                        </div>
+                      ) : <span className="text-xs text-muted-foreground">No filing period</span>}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <p className="text-xs text-muted-foreground">Feeds straight from the checklist — each obligated client's open period, plus every period already filed with the date it was filed. Filter by type or search a client above.</p>
+          <p className="text-xs text-muted-foreground">Feeds straight from the checklist — each obligated client's open period, plus every period already filed with the date it was filed. Filter by type, client, or assignee above. A receipt/proof of submission must be uploaded before a return can be marked filed; click a receipt name to download it.</p>
         </div>
       )}
 
