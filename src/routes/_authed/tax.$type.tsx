@@ -2,7 +2,7 @@ import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Trash2, Save, X } from "lucide-react";
+import { ArrowLeft, Trash2, Save, X, Upload, FileText } from "lucide-react";
 import { formatDate, formatDateTime, daysUntil, periodsOverdue, STATUS_COLORS } from "@/lib/format";
 import { TaxAssigneeSelect } from "@/components/tax-assignee-select";
 import { TaxAssignees } from "@/components/tax-assignees";
@@ -31,6 +31,8 @@ function TaxTypePage() {
   const [invoiceFor, setInvoiceFor] = useState<{ id: string; clientName?: string | null; description: string; then: () => Promise<void> } | null>(null);
 
   const [docCounts, setDocCounts] = useState<Record<string, number>>({});
+  const [docsByReturn, setDocsByReturn] = useState<Record<string, any[]>>({});
+  const [uploadingReceipt, setUploadingReceipt] = useState<string | null>(null);
   const [invoices, setInvoices] = useState<Record<string, any>>({});
 
   async function load() {
@@ -50,12 +52,18 @@ function TaxTypePage() {
     const ids = list.map((r: any) => r.id);
     const invoiceIds = [...new Set(list.map((r: any) => r.invoice_id).filter(Boolean))];
     const [d, inv] = await Promise.all([
-      ids.length ? supabase.from("documents").select("tax_return_id").in("tax_return_id", ids) : Promise.resolve({ data: [] } as any),
+      ids.length ? supabase.from("documents").select("id, client_id, tax_return_id, title, file_path, uploaded_by, created_at").in("tax_return_id", ids).order("created_at", { ascending: false }) : Promise.resolve({ data: [] } as any),
       invoiceIds.length ? supabase.from("invoices").select("id, invoice_number, status").in("id", invoiceIds) : Promise.resolve({ data: [] } as any),
     ]);
     const counts: Record<string, number> = {};
-    (d.data ?? []).forEach((row: any) => { if (row.tax_return_id) counts[row.tax_return_id] = (counts[row.tax_return_id] ?? 0) + 1; });
+    const groupedDocs: Record<string, any[]> = {};
+    (d.data ?? []).forEach((row: any) => {
+      if (!row.tax_return_id) return;
+      counts[row.tax_return_id] = (counts[row.tax_return_id] ?? 0) + 1;
+      (groupedDocs[row.tax_return_id] ??= []).push(row);
+    });
     setDocCounts(counts);
+    setDocsByReturn(groupedDocs);
     setInvoices(Object.fromEntries((inv.data ?? []).map((i: any) => [i.id, i])));
   }
   useEffect(() => { load(); }, [type]);
@@ -67,6 +75,11 @@ function TaxTypePage() {
   ), [rows, filter]);
 
   async function setStatus(id: string, status: string, skipInvoice = false) {
+    // Require proof of submission before a return can be marked filed.
+    if (status === "filed" && rows.find((r: any) => r.id === id)?.status !== "filed" && !docCounts[id]) {
+      toast.error("Upload the filing receipt in the Docs column before marking this return as filed.");
+      return;
+    }
     // A filing can't be marked filed until an invoice exists for it.
     const row = rows.find(r => r.id === id);
     if (!skipInvoice && status === "filed" && row?.status !== "filed" && !row?.invoice_id) {
@@ -82,6 +95,40 @@ function TaxTypePage() {
     else if (!data || data.length === 0) toast.error("You don't have permission to update this filing.");
     else load();
   }
+  async function uploadReceipt(row: any, file: File) {
+    setUploadingReceipt(row.id);
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const path = `${row.client_id}/tax-returns/${row.id}/${Date.now()}-${safeName}`;
+    const up = await supabase.storage.from("client-documents").upload(path, file);
+    if (up.error) {
+      toast.error(up.error.message);
+      setUploadingReceipt(null);
+      return;
+    }
+    const { error } = await supabase.from("documents").insert({
+      client_id: row.client_id,
+      tax_return_id: row.id,
+      title: file.name,
+      file_path: path,
+      uploaded_by: currentUser?.id ?? null,
+    } as any);
+    if (error) {
+      await supabase.storage.from("client-documents").remove([path]);
+      toast.error(error.message);
+    } else {
+      toast.success("Filing receipt uploaded");
+      await load();
+    }
+    setUploadingReceipt(null);
+  }
+
+  async function downloadReceipt(path: string) {
+    const { data, error } = await supabase.storage.from("client-documents").createSignedUrl(path, 60);
+    if (error) toast.error(error.message);
+    else window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  }
+
   async function remove(id: string) {
     if (!confirm("Remove this tax return?")) return;
     const { error } = await supabase.from("tax_returns").delete().eq("id", id);
@@ -90,6 +137,10 @@ function TaxTypePage() {
   async function saveEdit(skipInvoice = false) {
     const { id, clients: _c, assignee: _a, invoice_id: _inv, ...payload } = editing;
     const before = rows.find(r => r.id === id);
+    if (payload.status === "filed" && before?.status !== "filed" && !docCounts[id]) {
+      toast.error("Upload the filing receipt in the Docs column before saving this return as filed.");
+      return;
+    }
     if (!skipInvoice && payload.status === "filed" && before?.status !== "filed" && !before?.invoice_id) {
       setInvoiceFor({
         id, clientName: before?.clients?.company_name,
@@ -228,7 +279,19 @@ function TaxTypePage() {
                       />
                     </td>
                     <td className="py-2 px-3 relative"><TaxAssignees taxReturnId={r.id} compact /></td>
-                    <td className="text-xs text-muted-foreground">{docCounts[r.id] ? `${docCounts[r.id]} file${docCounts[r.id] > 1 ? "s" : ""}` : "—"}</td>
+                    <td className="py-2 px-2 min-w-[180px]">
+                      <div className="space-y-1.5">
+                        {(docsByReturn[r.id] ?? []).map((doc: any) => (
+                          <button key={doc.id} type="button" onClick={() => downloadReceipt(doc.file_path)} className="flex items-center gap-1 text-xs text-primary hover:underline max-w-[200px]" title={doc.title}>
+                            <FileText className="h-3 w-3 shrink-0" /><span className="truncate">{doc.title || "Filing receipt"}</span>
+                          </button>
+                        ))}
+                        <label className={`inline-flex items-center gap-1 text-xs text-primary cursor-pointer hover:underline ${uploadingReceipt === r.id ? "opacity-60" : ""}`}>
+                          <Upload className="h-3 w-3" /> {uploadingReceipt === r.id ? "Uploading…" : (docCounts[r.id] ? "Add receipt" : "Upload receipt *")}
+                          <input type="file" className="hidden" disabled={uploadingReceipt === r.id} onChange={e => { const file = e.target.files?.[0]; if (file) uploadReceipt(r, file); e.currentTarget.value = ""; }} />
+                        </label>
+                      </div>
+                    </td>
                     <td className="text-xs">
                       {r.invoice_id && invoices[r.invoice_id] ? (
                         <Link to="/accounts/$id" params={{ id: r.invoice_id }} className={`px-1.5 py-0.5 rounded-full capitalize ${STATUS_COLORS[invoices[r.invoice_id].status] ?? "bg-muted"}`}>
