@@ -4,9 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
 import { useLiveRefresh } from "@/hooks/use-live-refresh";
+import { useRouter } from "@tanstack/react-router";
 
 export function NotificationBell() {
   const { user } = useAuth();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<any[]>([]);
   const ref = useRef<HTMLDivElement>(null);
@@ -47,8 +49,18 @@ export function NotificationBell() {
     load();
   }
   async function markOne(id: string) {
-    await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", id);
-    load();
+    if (!user) return;
+    await supabase.from("notifications").update({ read_at: new Date().toISOString() })
+      .eq("id", id).eq("user_id", user.id);
+    await load();
+  }
+
+  async function openNotification(n: any) {
+    if (!n.read_at) await markOne(n.id);
+    setOpen(false);
+    if (typeof n.link === "string" && n.link.trim()) {
+      router.history.push(n.link);
+    }
   }
 
   return (
@@ -70,13 +82,26 @@ export function NotificationBell() {
           {items.length === 0 ? (
             <div className="p-6 text-center text-sm text-muted-foreground">No notifications</div>
           ) : items.map(n => (
-            <div key={n.id} className={`p-3 border-b last:border-0 text-sm ${!n.read_at ? "bg-accent/5" : ""}`}>
+            <div
+              key={n.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => void openNotification(n)}
+              onKeyDown={e => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  void openNotification(n);
+                }
+              }}
+              title={n.link ? "Open notification" : "This notification has no destination"}
+              className={`p-3 border-b last:border-0 text-sm ${!n.read_at ? "bg-accent/5" : ""} ${n.link ? "cursor-pointer hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" : "cursor-default"}`}
+            >
               <div className="flex justify-between gap-2">
                 <div className={`font-medium ${n.type === "deadline_reminder" ? "text-destructive" : ""}`}>{n.title}</div>
-                {!n.read_at && <button onClick={()=>markOne(n.id)} title="Mark read"><Check className="h-3 w-3 text-muted-foreground hover:text-primary" /></button>}
+                {!n.read_at && <button onClick={e => { e.stopPropagation(); void markOne(n.id); }} title="Mark read" aria-label="Mark notification read"><Check className="h-3 w-3 text-muted-foreground hover:text-primary" /></button>}
               </div>
               {n.body && <div className="text-xs text-muted-foreground mt-0.5">{n.body}</div>}
-              <div className="text-[10px] text-muted-foreground mt-1">{formatDate(n.created_at)}</div>
+              <div className="text-[10px] text-muted-foreground mt-1">{formatDate(n.created_at)}{n.link ? " · Click to open" : ""}</div>
             </div>
           ))}
         </div>
