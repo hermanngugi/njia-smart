@@ -53,7 +53,10 @@ export function createOfflineFetch(deps: FetchDeps): typeof fetch {
           settled.then((o: any) => { if (o.r?.ok) save(o.r, key, userId, table, method, url); });
           return store.toResponse(hit);
         }
-        first = await settled;
+        // Do not wait indefinitely when there is no cached copy. Let the caller
+        // handle this as a temporary network failure; the next refresh can retry.
+        status.markReachable(false);
+        throw new TypeError("Network request timed out");
       }
       if ("e" in first) {
         if (isAbort(first.e, init)) throw first.e;

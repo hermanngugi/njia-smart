@@ -14,6 +14,16 @@ export type SyncDeps = {
 let deps: SyncDeps | null = null;
 let flushing = false;
 let timer: ReturnType<typeof setTimeout> | null = null;
+const REPLAY_TIMEOUT_MS = 12_000;
+const AUTH_TIMEOUT_MS = 8_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => { timer = setTimeout(() => reject(new Error(message)), ms); }),
+  ]).finally(() => { if (timer) clearTimeout(timer); });
+}
 
 export function initSync(d: SyncDeps) {
   deps = d;
@@ -68,9 +78,26 @@ function replayHeaders(item: OutboxItem, token: string): Headers {
 
 async function replay(item: OutboxItem, token: string): Promise<Result> {
   let res: Response;
+  const controller = new AbortController();
+  let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
-    res = await deps!.rawFetch(item.url, { method: item.method, headers: replayHeaders(item, token), body: item.body ?? undefined });
+    const request = deps!.rawFetch(item.url, {
+      method: item.method,
+      headers: replayHeaders(item, token),
+      body: item.body ?? undefined,
+      signal: controller.signal,
+    });
+    res = await Promise.race([
+      request,
+      new Promise<Response>((_, reject) => {
+        timeout = setTimeout(() => {
+          controller.abort();
+          reject(new Error("Sync request timed out"));
+        }, REPLAY_TIMEOUT_MS);
+      }),
+    ]);
   } catch { return { kind: "retry" }; }
+  finally { if (timeout) clearTimeout(timeout); }
 
   if (res.ok) {
     if (item.method === "PATCH") {
@@ -108,7 +135,7 @@ export async function flush(): Promise<void> {
     let ok = 0; let failed = 0;
     try {
       const uid = deps!.getUserId();
-      let token = await deps!.getAccessToken();
+      let token = await withTimeout(deps!.getAccessToken(), AUTH_TIMEOUT_MS, "Authentication timed out").catch(() => null);
       if (!uid || !token) return;
       status.setSyncing(true);
       let guard = 0;
@@ -118,7 +145,7 @@ export async function flush(): Promise<void> {
         let r = await replay(next, token);
         if (r.kind === "again") r = await replay(next, token);
         if (r.kind === "retry") {
-          const fresh = await deps!.refreshToken().catch(() => null);
+          const fresh = await withTimeout(deps!.refreshToken(), AUTH_TIMEOUT_MS, "Token refresh timed out").catch(() => null);
           if (fresh && fresh !== token) { token = fresh; r = await replay(next, token); }
         }
         if (r.kind === "ok") { await store.outboxDelete(next.id!); ok++; }
