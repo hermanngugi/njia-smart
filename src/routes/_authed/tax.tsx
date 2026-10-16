@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useLiveRefresh } from "@/hooks/use-live-refresh";
 import { toast } from "sonner";
-import { AlertTriangle, Clock, UserX, LayoutGrid, Check, ChevronDown, ChevronUp } from "lucide-react";
+import { AlertTriangle, Clock, UserX, LayoutGrid, Check, ChevronDown, ChevronUp, Download, Eye, FileText, Upload } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { CompletionInvoiceDialog } from "@/components/completion-invoice-dialog";
 import { daysUntil, periodsOverdue, formatDate, formatDateTime } from "@/lib/format";
@@ -39,7 +39,7 @@ async function fetchAll(page: (from: number, to: number) => PromiseLike<{ data: 
 }
 
 function TaxPage() {
-  const { isAdmin, canCreate } = useAuth();
+  const { user, isAdmin, canCreate } = useAuth();
   const [tab, setTab] = useState<(typeof TABS)[number]>("Overview");
   const [policies, setPolicies] = useState<any[]>([]);
   const [returns, setReturns] = useState<any[]>([]);
@@ -58,6 +58,8 @@ function TaxPage() {
   const [expandedType, setExpandedType] = useState<string | null>(null);
   const attemptedSchedule = useRef<Set<string>>(new Set());
   const [scheduleFailed, setScheduleFailed] = useState<Set<string>>(new Set());
+  const [filingDocs, setFilingDocs] = useState<Record<string, any[]>>({});
+  const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
 
   async function load(silent = false) {
     if (!silent) setLoading(true);
@@ -75,6 +77,17 @@ function TaxPage() {
     setClients(c.data ?? []);
     setStaff(s.data ?? []);
     setObligations(o as any[]);
+    const returnIds = (r as any[]).map((row: any) => row.id).filter(Boolean);
+    const filingDocRows = returnIds.length
+      ? await fetchAll((a, b) => supabase.from("documents" as any).select("id, tax_return_id, title, file_path, created_at, uploaded_by").in("tax_return_id", returnIds).order("created_at", { ascending: false }).range(a, b))
+      : [];
+    const docsByReturn: Record<string, any[]> = {};
+    (filingDocRows as any[]).forEach((doc: any) => {
+      if (!doc.tax_return_id) return;
+      if (!docsByReturn[doc.tax_return_id]) docsByReturn[doc.tax_return_id] = [];
+      docsByReturn[doc.tax_return_id].push(doc);
+    });
+    setFilingDocs(docsByReturn);
     const ca = await fetchAll((a, b) => supabase.from("tax_return_assignees" as any).select("id, tax_return_id, user_id").order("id").range(a, b));
     const cm = new Map<string, string[]>();
     (ca as any[]).forEach((c: any) => { if (!cm.has(c.tax_return_id)) cm.set(c.tax_return_id, []); cm.get(c.tax_return_id)!.push(c.user_id); });
@@ -82,7 +95,7 @@ function TaxPage() {
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
-  useLiveRefresh(["tax_returns", "tax_return_assignees", "client_tax_obligations"], () => load(true));
+  useLiveRefresh(["tax_returns", "tax_return_assignees", "client_tax_obligations", "documents"], () => load(true));
 
   const activePolicies = useMemo(() => policies.filter(p => p.active), [policies]);
 
@@ -239,6 +252,96 @@ function TaxPage() {
     if (reportFilter === "all") return reportRows;
     return reportRows.filter(r => (reportFilter === "filed" ? r.filed : !r.filed));
   }, [reportRows, reportFilter]);
+
+  async function uploadFilingDocument(returnId: string, clientId: string, file: File) {
+    if (!file || !user?.id) return;
+    setUploadingDoc(returnId);
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-");
+    const path = `tax-filings/${clientId}/${returnId}/${Date.now()}-${safeName}`;
+    const upload = await supabase.storage.from("client-documents").upload(path, file, { upsert: false, contentType: file.type || undefined });
+    if (upload.error) {
+      setUploadingDoc(null);
+      toast.error(upload.error.message);
+      return;
+    }
+
+    const { error: docError } = await supabase.from("documents" as any).insert({
+      client_id: clientId,
+      tax_return_id: returnId,
+      title: file.name,
+      file_path: path,
+      uploaded_by: user.id,
+      version: 1,
+    } as any);
+
+    if (docError) {
+      await supabase.storage.from("client-documents").remove([path]);
+      toast.error(docError.message);
+    } else {
+      toast.success("Filing proof uploaded");
+      await load();
+    }
+    setUploadingDoc(null);
+  }
+
+  function chooseFilingDocument(returnId: string, clientId: string) {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx";
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (file) void uploadFilingDocument(returnId, clientId, file);
+    };
+    input.click();
+  }
+
+  async function openFilingDocument(doc: any, download = false) {
+    if (!doc?.file_path) return;
+    const { data, error } = await supabase.storage.from("client-documents").createSignedUrl(doc.file_path, 600, download ? { download: doc.title || true } : undefined);
+    if (error || !data?.signedUrl) {
+      toast.error(error?.message ?? "Could not open the filing document.");
+      return;
+    }
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  }
+
+  function filingDocumentCell(row: any) {
+    const docs = filingDocs[row.cur?.id] ?? [];
+    const latest = docs[0];
+    if (!row.cur) return <span className="text-muted-foreground">—</span>;
+    return (
+      <div className="min-w-[190px] space-y-1">
+        {latest ? (
+          <>
+            <div className="flex items-center gap-1.5 text-xs font-medium max-w-[240px]" title={latest.title}>
+              <FileText className="h-3.5 w-3.5 shrink-0 text-primary" />
+              <span className="truncate">{latest.title}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => openFilingDocument(latest)} className="text-[11px] text-primary hover:underline inline-flex items-center gap-1">
+                <Eye className="h-3 w-3" /> View
+              </button>
+              <button type="button" onClick={() => openFilingDocument(latest, true)} className="text-[11px] text-primary hover:underline inline-flex items-center gap-1">
+                <Download className="h-3 w-3" /> Download
+              </button>
+              {canCreate("tax") && (
+                <button type="button" onClick={() => chooseFilingDocument(row.cur.id, row.client.id)} disabled={uploadingDoc === row.cur.id} className="text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
+                  <Upload className="h-3 w-3" /> {uploadingDoc === row.cur.id ? "Uploading…" : "Replace"}
+                </button>
+              )}
+            </div>
+            {docs.length > 1 && <div className="text-[10px] text-muted-foreground">{docs.length} documents linked</div>}
+          </>
+        ) : canCreate("tax") ? (
+          <button type="button" onClick={() => chooseFilingDocument(row.cur.id, row.client.id)} disabled={uploadingDoc === row.cur.id} className="text-xs text-primary hover:underline inline-flex items-center gap-1">
+            <Upload className="h-3.5 w-3.5" /> {uploadingDoc === row.cur.id ? "Uploading…" : "Upload filing proof"}
+          </button>
+        ) : (
+          <span className="text-xs text-muted-foreground">No document</span>
+        )}
+      </div>
+    );
+  }
 
   async function toggleObligation(clientId: string, taxType: string, next: boolean) {
     const key = `${clientId}:${taxType}`;
@@ -496,10 +599,10 @@ function TaxPage() {
           <div className="bg-card border rounded-lg overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-muted/40 text-left text-xs text-muted-foreground border-b">
-                <tr><th className="py-2 px-3">Client</th><th className="py-2 px-3">Tax type</th><th className="py-2 px-3">Status</th><th className="py-2 px-3">Period ending</th><th className="py-2 px-3">Due date</th><th className="py-2 px-3">Assigned to</th><th className="py-2 px-3">Filed on</th></tr>
+                <tr><th className="py-2 px-3">Client</th><th className="py-2 px-3">Tax type</th><th className="py-2 px-3">Status</th><th className="py-2 px-3">Period ending</th><th className="py-2 px-3">Due date</th><th className="py-2 px-3">Assigned to</th><th className="py-2 px-3">Filed on</th><th className="py-2 px-3">Filing document</th></tr>
               </thead>
               <tbody>
-                {filteredReportRows.length === 0 && <tr><td colSpan={7} className="py-8 text-center text-muted-foreground">No obligations match this view.</td></tr>}
+                {filteredReportRows.length === 0 && <tr><td colSpan={8} className="py-8 text-center text-muted-foreground">No obligations match this view.</td></tr>}
                 {filteredReportRows.map(row => (
                   <tr key={row.key} className="border-b last:border-0 hover:bg-muted/20">
                     <td className="py-1.5 px-3 font-medium">{row.client.company_name}</td>
@@ -528,6 +631,7 @@ function TaxPage() {
                         </>
                       ) : "—"}
                     </td>
+                    <td className="py-1.5 px-3">{filingDocumentCell(row)}</td>
                   </tr>
                 ))}
               </tbody>
