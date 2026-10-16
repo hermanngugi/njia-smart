@@ -269,9 +269,16 @@ function TaxPage() {
     [assigneeScopedReportRows, reportFilter]
   );
 
-  function downloadReportCsv() {
-    if (filteredReportRows.length === 0) {
-      toast.error("There are no tax filing records to download for the selected filters.");
+  function downloadReportCsv(statusFilter: "all" | "filed" | "not_filed" = reportFilter) {
+    // Export from the same report data as the table, but apply the requested
+    // status explicitly so the Not filed button can never export Filed rows.
+    const rowsToExport = assigneeScopedReportRows.filter(row =>
+      statusFilter === "all" || (statusFilter === "filed" ? row.filed : !row.filed)
+    );
+
+    if (rowsToExport.length === 0) {
+      const statusLabel = statusFilter === "not_filed" ? "not-filed" : statusFilter;
+      toast.error(`There are no ${statusLabel} tax filing records to download for the selected filters.`);
       return;
     }
 
@@ -303,18 +310,21 @@ function TaxPage() {
     };
     const csv = "\uFEFF" + [
       columns.map(column => column.header),
-      ...filteredReportRows.map(row => columns.map(column => column.value(row))),
+      ...rowsToExport.map(row => columns.map(column => column.value(row))),
     ].map(line => line.map(csvCell).join(",")).join("\r\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `tax-filing-summary-${new Date().toISOString().slice(0, 10)}.csv`;
+    const date = new Date().toISOString().slice(0, 10);
+    const statusSuffix = statusFilter === "not_filed" ? "not-filed" : statusFilter;
+    link.download = `tax-filing-${statusSuffix}-${date}.csv`;
     document.body.appendChild(link);
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    toast.success(`Downloaded ${filteredReportRows.length} tax filing record${filteredReportRows.length === 1 ? "" : "s"} as an 8-column summary CSV.`);
+    const statusLabel = statusFilter === "not_filed" ? "Not filed" : statusFilter === "filed" ? "Filed" : "all";
+    toast.success(`Downloaded ${rowsToExport.length} ${statusLabel.toLowerCase()} record${rowsToExport.length === 1 ? "" : "s"} as an 8-column CSV.`);
   }
 
   async function uploadReceipt(returnId: string, clientId: string, file: File) {
@@ -616,9 +626,17 @@ function TaxPage() {
               <ChecklistChip active={reportFilter === "filed"} onClick={() => setReportFilter("filed")} icon={Check} label="Filed" value={assigneeScopedReportRows.filter(r => r.filed).length} tone="muted" />
               <ChecklistChip active={reportFilter === "not_filed"} onClick={() => setReportFilter("not_filed")} icon={AlertTriangle} label="Not filed" value={assigneeScopedReportRows.filter(r => !r.filed).length} tone="destructive" />
             </div>
-            <button type="button" onClick={downloadReportCsv} disabled={filteredReportRows.length === 0} className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
-              <Download className="h-4 w-4" /> Download Summary CSV · 8 columns ({filteredReportRows.length})
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => downloadReportCsv("all")} disabled={assigneeScopedReportRows.length === 0} className="inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50">
+                <Download className="h-4 w-4" /> Download All ({assigneeScopedReportRows.length})
+              </button>
+              <button type="button" onClick={() => downloadReportCsv("filed")} disabled={!assigneeScopedReportRows.some(row => row.filed)} className="inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50">
+                <Download className="h-4 w-4" /> Download Filed ({assigneeScopedReportRows.filter(row => row.filed).length})
+              </button>
+              <button type="button" onClick={() => downloadReportCsv("not_filed")} disabled={!assigneeScopedReportRows.some(row => !row.filed)} className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
+                <Download className="h-4 w-4" /> Download Not Filed ({assigneeScopedReportRows.filter(row => !row.filed).length})
+              </button>
+            </div>
           </div>
 
           <div className="bg-card border rounded-lg overflow-hidden">
