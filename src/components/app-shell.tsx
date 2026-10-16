@@ -182,13 +182,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground hover:translate-x-0.5"
                     }`}
                   >
-                    {childActive && <span aria-hidden className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-accent" />}
+                    {childActive && <span aria-hidden className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-accent transition-all duration-200 ease-out" />}
                     <Icon className="h-4 w-4 shrink-0" />
                     <span className={expanded ? "" : "lg:hidden"}>{item.label}</span>
-                    <ChevronDown className={`ml-auto h-4 w-4 transition-transform ${open_ ? "rotate-180" : ""} ${expanded ? "" : "lg:hidden"}`} />
+                    <ChevronDown className={`ml-auto h-4 w-4 transition-transform duration-200 ease-out ${open_ ? "rotate-180" : ""} ${expanded ? "" : "lg:hidden"}`} />
                   </button>
                   {open_ && expanded && (
-                    <div className="mt-0.5 ml-4 pl-3 border-l border-sidebar-border space-y-0.5">
+                    <div className="nav-submenu-enter mt-0.5 ml-4 pl-3 border-l border-sidebar-border space-y-0.5">
                       {item.children.map(({ to, label, icon: ChildIcon }) => {
                         const active = isActivePath(pathname, to);
                         return (
@@ -202,7 +202,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                                 : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground hover:translate-x-0.5"
                             }`}
                           >
-                            {active && <span aria-hidden className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-accent" />}
+                            {active && <span aria-hidden className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-accent transition-all duration-200 ease-out" />}
                             <ChildIcon className="h-3.5 w-3.5 shrink-0" />
                             {label}
                           </Link>
@@ -227,7 +227,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground hover:translate-x-0.5"
                 }`}
               >
-                {active && <span aria-hidden className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-accent" />}
+                {active && <span aria-hidden className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-accent transition-all duration-200 ease-out" />}
                 <Icon className="h-4 w-4 shrink-0" />
                 <span className={expanded ? "" : "lg:hidden"}>{label}</span>
                 {to === "/chat" && chatUnread > 0 && (
