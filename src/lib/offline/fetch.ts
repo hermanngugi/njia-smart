@@ -7,6 +7,7 @@ import { parseQuery } from "./filters.ts";
 export type FetchDeps = {
   baseFetch: typeof fetch;             // supabase's own (auth-attaching) fetch
   restBase: string;                    // e.g. https://xyz.supabase.co/rest/v1/
+  apiKey?: string;                     // Supabase publishable/anon key for queued REST requests
   getUserId: () => string | null;      // the signed-in user, even when the token is expired
   onQueued?: (info: { table: string; method: string }) => void;
   scheduleFlush?: () => void;
@@ -131,7 +132,9 @@ export function createOfflineFetch(deps: FetchDeps): typeof fetch {
 
     const keep: Record<string, string> = {};
     for (const h of ["content-type", "apikey", "prefer", "content-profile", "accept-profile"]) {
-      const v = headers.get(h); if (v) keep[h] = v;
+      const v = headers.get(h);
+      if (v) keep[h] = v;
+      else if (h === "apikey" && deps.apiKey) keep[h] = deps.apiKey;
     }
     try {
       await store.outboxAdd({ userId, method, url, table, headers: keep, body, ts: Date.now(), status: "pending", injectedId: injected, attempts: 0 });

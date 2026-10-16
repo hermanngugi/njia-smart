@@ -5,6 +5,7 @@ import type { OutboxItem } from "./store.ts";
 
 export type SyncDeps = {
   rawFetch: typeof fetch;                       // plain fetch, NOT the caching wrapper
+  apiKey: string;                               // Supabase publishable/anon key for REST replay
   getAccessToken: () => Promise<string | null>; // fresh token (refreshes if needed)
   refreshToken: () => Promise<string | null>;
   getUserId: () => string | null;
@@ -67,7 +68,11 @@ type Result = { kind: "ok" } | { kind: "retry" } | { kind: "again" } | { kind: "
 
 function replayHeaders(item: OutboxItem, token: string): Headers {
   const h = new Headers();
-  for (const k of ["content-type", "apikey", "content-profile", "accept-profile"]) if (item.headers[k]) h.set(k, item.headers[k]);
+  for (const k of ["content-type", "content-profile", "accept-profile"]) if (item.headers[k]) h.set(k, item.headers[k]);
+  // Outbox records created by older app versions may not contain apikey. Always
+  // attach the configured project key when replaying, rather than relying on saved headers.
+  const apiKey = item.headers.apikey || deps?.apiKey;
+  if (apiKey) h.set("apikey", apiKey);
   const prefer = (item.headers["prefer"] ?? "").split(",").map((s) => s.trim()).filter((p) => p && !p.startsWith("return="));
   prefer.push(item.method === "PATCH" ? "return=representation" : "return=minimal");
   h.set("Prefer", prefer.join(","));

@@ -83,6 +83,7 @@ function install() {
 
     initSync({
       rawFetch,
+      apiKey: apikey,
       getUserId: getStoredUserId,
       getAccessToken: async () => (await supabase.auth.getSession()).data.session?.access_token ?? null,
       refreshToken: async () => (await supabase.auth.refreshSession()).data.session?.access_token ?? null,
@@ -95,6 +96,7 @@ function install() {
     rest.fetch = createOfflineFetch({
       baseFetch: authedFetch,
       restBase,
+      apiKey: apikey,
       getUserId: getStoredUserId,
       scheduleFlush: () => scheduleFlush(status.isOnline() ? 500 : cfg.retryIntervalMs),
       onQueued: () => toast.info("Saved on this device - it will sync when you're back online", { id: "offline-queued" }),
