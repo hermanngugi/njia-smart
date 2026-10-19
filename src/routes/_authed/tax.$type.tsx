@@ -28,7 +28,7 @@ function TaxTypePage() {
   const [filter, setFilter] = useState({ client: search.client ?? "", assignee: "", status: "" });
   const [editing, setEditing] = useState<any>(null);
   const [policy, setPolicy] = useState<any>(null);
-  const [invoiceFor, setInvoiceFor] = useState<{ id: string; clientName?: string | null; description: string; then: () => Promise<void> } | null>(null);
+  const [invoiceFor, setInvoiceFor] = useState<{ id: string; row: any; clientName?: string | null; description: string; needsReceipt: boolean; then: () => Promise<void> } | null>(null);
 
   const [docCounts, setDocCounts] = useState<Record<string, number>>({});
   const [docsByReturn, setDocsByReturn] = useState<Record<string, any[]>>({});
@@ -74,28 +74,34 @@ function TaxTypePage() {
     (!filter.status || r.status === filter.status)
   ), [rows, filter]);
 
+  // `skipInvoice` is only passed by the invoice prompt once it has generated the
+  // invoice (and stored the receipt), so neither check repeats.
   async function setStatus(id: string, status: string, skipInvoice = false) {
-    // Require proof of submission before a return can be marked filed.
-    if (status === "filed" && rows.find((r: any) => r.id === id)?.status !== "filed" && !docCounts[id]) {
-      toast.error("Upload the filing receipt in the Docs column before marking this return as filed.");
-      return;
-    }
-    // A filing can't be marked filed until an invoice exists for it.
     const row = rows.find(r => r.id === id);
-    if (!skipInvoice && status === "filed" && row?.status !== "filed" && !row?.invoice_id) {
-      setInvoiceFor({
-        id, clientName: row?.clients?.company_name,
-        description: `${label} filing — period ending ${formatDate(row?.period_end)}`,
-        then: () => setStatus(id, status, true),
-      });
-      return;
+    if (!skipInvoice && status === "filed" && row?.status !== "filed") {
+      // Mandatory prompt first: invoice amount, plus the filing receipt if none
+      // is attached yet. Submitting it registers the return as filed.
+      if (!row?.invoice_id) {
+        setInvoiceFor({
+          id, row, clientName: row?.clients?.company_name,
+          description: `${label} filing — period ending ${formatDate(row?.period_end)}`,
+          needsReceipt: !docCounts[id],
+          then: () => setStatus(id, status, true),
+        });
+        return;
+      }
+      // Invoice already exists but there's still no proof of submission.
+      if (!docCounts[id]) {
+        toast.error("Upload the filing receipt in the Docs column before marking this return as filed.");
+        return;
+      }
     }
     const { data, error } = await supabase.from("tax_returns").update({ status: status as any }).eq("id", id).select("id");
     if (error) toast.error(error.message);
     else if (!data || data.length === 0) toast.error("You don't have permission to update this filing.");
     else load();
   }
-  async function uploadReceipt(row: any, file: File) {
+  async function uploadReceipt(row: any, file: File): Promise<boolean> {
     setUploadingReceipt(row.id);
     const { data: { user: currentUser } } = await supabase.auth.getUser();
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -104,7 +110,7 @@ function TaxTypePage() {
     if (up.error) {
       toast.error(up.error.message);
       setUploadingReceipt(null);
-      return;
+      return false;
     }
     const { error } = await supabase.from("documents").insert({
       client_id: row.client_id,
@@ -113,14 +119,17 @@ function TaxTypePage() {
       file_path: path,
       uploaded_by: currentUser?.id ?? null,
     } as any);
+    let ok = true;
     if (error) {
       await supabase.storage.from("client-documents").remove([path]);
       toast.error(error.message);
+      ok = false;
     } else {
       toast.success("Filing receipt uploaded");
       await load();
     }
     setUploadingReceipt(null);
+    return ok;
   }
 
   async function downloadReceipt(path: string) {
@@ -137,17 +146,20 @@ function TaxTypePage() {
   async function saveEdit(skipInvoice = false) {
     const { id, clients: _c, assignee: _a, invoice_id: _inv, ...payload } = editing;
     const before = rows.find(r => r.id === id);
-    if (payload.status === "filed" && before?.status !== "filed" && !docCounts[id]) {
-      toast.error("Upload the filing receipt in the Docs column before saving this return as filed.");
-      return;
-    }
-    if (!skipInvoice && payload.status === "filed" && before?.status !== "filed" && !before?.invoice_id) {
-      setInvoiceFor({
-        id, clientName: before?.clients?.company_name,
-        description: `${label} filing — period ending ${formatDate(before?.period_end)}`,
-        then: () => saveEdit(true),
-      });
-      return;
+    if (!skipInvoice && payload.status === "filed" && before?.status !== "filed") {
+      if (!before?.invoice_id) {
+        setInvoiceFor({
+          id, row: before, clientName: before?.clients?.company_name,
+          description: `${label} filing — period ending ${formatDate(before?.period_end)}`,
+          needsReceipt: !docCounts[id],
+          then: () => saveEdit(true),
+        });
+        return;
+      }
+      if (!docCounts[id]) {
+        toast.error("Upload the filing receipt in the Docs column before saving this return as filed.");
+        return;
+      }
     }
     const { data, error } = await supabase.from("tax_returns").update(payload).eq("id", id).select("id");
     if (error) { toast.error(error.message); return; }
@@ -355,6 +367,9 @@ function TaxTypePage() {
           sourceId={invoiceFor.id}
           clientName={invoiceFor.clientName}
           defaultDescription={invoiceFor.description}
+          requireFile={invoiceFor.needsReceipt}
+          fileLabel="Filing receipt"
+          onUploadFile={file => uploadReceipt(invoiceFor.row, file)}
           onInvoiced={async () => { await invoiceFor.then(); setInvoiceFor(null); }}
         />
       )}

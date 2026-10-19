@@ -52,7 +52,7 @@ function TaxPage() {
   const [uploadingReceipt, setUploadingReceipt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyCell, setBusyCell] = useState<string | null>(null);
-  const [invoiceFor, setInvoiceFor] = useState<{ id: string; clientName?: string | null; description: string } | null>(null);
+  const [invoiceFor, setInvoiceFor] = useState<{ id: string; clientId: string; clientName?: string | null; description: string; needsReceipt: boolean } | null>(null);
   const [clientFilter, setClientFilter] = useState("");
   const [accFilter, setAccFilter] = useState<"all" | "overdue" | "duesoon" | "unassigned">("all");
   const [checklistType, setChecklistType] = useState<string>(ALL_TYPES);
@@ -327,7 +327,7 @@ function TaxPage() {
     toast.success(`Downloaded ${rowsToExport.length} ${statusLabel.toLowerCase()} record${rowsToExport.length === 1 ? "" : "s"} as an 8-column CSV.`);
   }
 
-  async function uploadReceipt(returnId: string, clientId: string, file: File) {
+  async function uploadReceipt(returnId: string, clientId: string, file: File): Promise<boolean> {
     setUploadingReceipt(returnId);
     const { data: { user } } = await supabase.auth.getUser();
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -336,7 +336,7 @@ function TaxPage() {
     if (upload.error) {
       toast.error(upload.error.message);
       setUploadingReceipt(null);
-      return;
+      return false;
     }
     const { error } = await supabase.from("documents").insert({
       client_id: clientId,
@@ -345,14 +345,17 @@ function TaxPage() {
       file_path: path,
       uploaded_by: user?.id ?? null,
     } as any);
+    let ok = true;
     if (error) {
       await supabase.storage.from("client-documents").remove([path]);
       toast.error(error.message);
+      ok = false;
     } else {
       toast.success("Filing receipt uploaded");
       await load(true);
     }
     setUploadingReceipt(null);
+    return ok;
   }
 
   async function downloadReceipt(path: string) {
@@ -374,20 +377,29 @@ function TaxPage() {
 
   // Mark a filing filed (or reopen it) directly from the Checklist / Overview,
   // without needing to drill into the per-type page first.
+  // `skipInvoice` is only passed by the invoice prompt below once it has
+  // generated the invoice (and stored the receipt), so neither check repeats.
   async function markFiled(returnId: string, filed: boolean, skipInvoice = false) {
-    // A filing must have a receipt/proof of submission attached before it can be marked filed.
-    if (filed && !(documentsByReturn.get(returnId)?.length)) {
-      toast.error("Upload the filing receipt in Tax → Filing Record before marking this return as filed.");
-      setTab("Filing Record");
-      return;
-    }
-    // A filing can't be marked filed until an invoice exists for it.
     if (filed && !skipInvoice) {
       const r = returns.find((x: any) => x.id === returnId);
+      const hasReceipt = !!(documentsByReturn.get(returnId)?.length);
+      // Ticking "Filed" opens the mandatory prompt first: invoice amount, plus
+      // the filing receipt if one hasn't been attached yet. Submitting it
+      // registers the return as filed in one step.
       if (r && r.status !== "filed" && !r.invoice_id) {
         const c = clients.find((x: any) => x.id === r.client_id);
         const pol = policies.find((x: any) => x.tax_type === r.return_type);
-        setInvoiceFor({ id: returnId, clientName: c?.company_name, description: `${pol?.label ?? r.return_type} filing — period ending ${formatDate(r.period_end)}` });
+        setInvoiceFor({
+          id: returnId, clientId: r.client_id, clientName: c?.company_name,
+          description: `${pol?.label ?? r.return_type} filing — period ending ${formatDate(r.period_end)}`,
+          needsReceipt: !hasReceipt,
+        });
+        return;
+      }
+      // Invoice already exists but there's still no proof of submission.
+      if (!hasReceipt) {
+        toast.error("Upload the filing receipt in Tax → Filing Record before marking this return as filed.");
+        setTab("Filing Record");
         return;
       }
     }
@@ -706,6 +718,9 @@ function TaxPage() {
           sourceId={invoiceFor.id}
           clientName={invoiceFor.clientName}
           defaultDescription={invoiceFor.description}
+          requireFile={invoiceFor.needsReceipt}
+          fileLabel="Filing receipt"
+          onUploadFile={file => uploadReceipt(invoiceFor.id, invoiceFor.clientId, file)}
           onInvoiced={async () => { await markFiled(invoiceFor.id, true, true); setInvoiceFor(null); }}
         />
       )}
