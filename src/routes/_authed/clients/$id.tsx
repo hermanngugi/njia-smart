@@ -56,10 +56,10 @@ function ClientDetail() {
     setRecordUpdaterName((recordProf.data as any)?.full_name ?? null);
     const [tax, eng, adv, docs, tasks, contacts, pols, obl] = await Promise.all([
       supabase.from("tax_returns").select("*").eq("client_id", id).order("due_date"),
-      supabase.from("engagements").select("*").eq("client_id", id).order("created_at", { ascending: false }),
+      supabase.from("engagements").select("*").eq("client_id", id).order("updated_at", { ascending: false }).order("created_at", { ascending: false }),
       supabase.from("advisory_projects").select("*").eq("client_id", id),
-      supabase.from("documents").select("*").eq("client_id", id).order("created_at", { ascending: false }),
-      supabase.from("tasks").select("*").eq("client_id", id).order("created_at", { ascending: false }),
+      supabase.from("documents").select("*").eq("client_id", id).order("updated_at", { ascending: false }).order("created_at", { ascending: false }),
+      supabase.from("tasks").select("*").eq("client_id", id).order("updated_at", { ascending: false }).order("created_at", { ascending: false }),
       supabase.from("client_contacts").select("*").eq("client_id", id),
       supabase.from("tax_policies").select("*").eq("active", true).order("sort_order"),
       supabase.from("client_tax_obligations").select("*").eq("client_id", id).eq("active", true),

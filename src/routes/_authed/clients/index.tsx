@@ -28,7 +28,7 @@ function ClientsList() {
 
   async function load() {
     const [cRes, aRes, pRes] = await Promise.all([
-      supabase.from("clients").select("*").order("client_type", { ascending: true }).order("company_name", { ascending: true }),
+      supabase.from("clients").select("*").order("updated_at", { ascending: false }).order("created_at", { ascending: false }).order("company_name", { ascending: true }),
       supabase.from("client_assignments").select("client_id, user_id"),
       supabase.from("profiles").select("id, full_name"),
     ]);
