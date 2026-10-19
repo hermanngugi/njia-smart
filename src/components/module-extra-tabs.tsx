@@ -38,7 +38,7 @@ export function BillingTab({ serviceLine }: { serviceLine: string }) {
   const [invoices, setInvoices] = useState<any[]>([]);
   useEffect(() => {
     (async () => {
-      const { data, error } = await supabase.from("invoices").select("*, clients(company_name)").eq("service_line", serviceLine).order("issue_date", { ascending: false });
+      const { data, error } = await supabase.from("invoices").select("*, clients(company_name)").eq("service_line", serviceLine).order("updated_at", { ascending: false }).order("issue_date", { ascending: false });
       if (error) toast.error(error.message); else setInvoices(data ?? []);
     })();
   }, [serviceLine]);

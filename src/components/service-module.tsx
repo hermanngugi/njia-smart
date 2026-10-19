@@ -94,7 +94,7 @@ export function ServiceModulePage({
 
   async function load() {
     const [p, c, s] = await Promise.all([
-      supabase.from("service_projects" as any).select(PROJECT_SELECT).eq("module", moduleKey).order("created_at", { ascending: false }),
+      supabase.from("service_projects" as any).select(PROJECT_SELECT).eq("module", moduleKey).order("updated_at", { ascending: false }).order("created_at", { ascending: false }),
       supabase.from("clients").select("id, company_name").order("company_name"),
       supabase.from("profiles").select("id, full_name"),
     ]);
@@ -105,12 +105,12 @@ export function ServiceModulePage({
   const moduleClientIds = Array.from(new Set(rows.map(r => r.client_id).filter(Boolean)));
 
   async function loadBilling() {
-    const { data, error } = await supabase.from("invoices").select("*, clients(company_name)").eq("service_line", serviceLineFor(moduleKey)).order("issue_date", { ascending: false });
+    const { data, error } = await supabase.from("invoices").select("*, clients(company_name)").eq("service_line", serviceLineFor(moduleKey)).order("updated_at", { ascending: false }).order("issue_date", { ascending: false });
     if (error) toast.error(error.message); else setInvoices(data ?? []);
   }
   async function loadDocuments() {
     if (moduleClientIds.length === 0) { setDocs([]); return; }
-    const { data, error } = await supabase.from("documents").select("*, clients(company_name)").in("client_id", moduleClientIds).order("created_at", { ascending: false });
+    const { data, error } = await supabase.from("documents").select("*, clients(company_name)").in("client_id", moduleClientIds).order("updated_at", { ascending: false }).order("created_at", { ascending: false });
     if (error) toast.error(error.message); else setDocs(data ?? []);
   }
   useEffect(() => {
