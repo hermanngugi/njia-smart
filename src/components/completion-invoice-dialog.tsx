@@ -21,6 +21,7 @@ export type CompletionSource = "tax_returns" | "engagements" | "advisory_project
  */
 export function CompletionInvoiceDialog({
   open, onOpenChange, source, sourceId, clientName, defaultDescription, onInvoiced,
+  requireFile, fileLabel, onUploadFile,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -29,19 +30,30 @@ export function CompletionInvoiceDialog({
   clientName?: string | null;
   defaultDescription?: string;
   onInvoiced: (invoiceId: string) => void | Promise<void>;
+  /** Also require a file (e.g. the tax filing receipt) in this same step. */
+  requireFile?: boolean;
+  fileLabel?: string;
+  /** Saves the chosen file; return true when it was stored. */
+  onUploadFile?: (file: File) => Promise<boolean>;
 }) {
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (open) { setDescription(defaultDescription ?? ""); setAmount(""); }
+    if (open) { setDescription(defaultDescription ?? ""); setAmount(""); setFile(null); }
   }, [open, sourceId, defaultDescription]);
 
   async function submit() {
     const amt = Number(amount);
     if (!amt || amt <= 0) { toast.error("Enter the amount to invoice"); return; }
+    if (requireFile && !file) { toast.error(`Attach the ${fileLabel ?? "required file"} to continue`); return; }
     setBusy(true);
+    if (requireFile && file && onUploadFile) {
+      const stored = await onUploadFile(file);
+      if (!stored) { setBusy(false); return; }
+    }
     const { data, error } = await supabase.rpc("create_completion_invoice" as any, {
       _source: source, _source_id: sourceId, _description: description, _amount: amt,
     } as any);
@@ -61,6 +73,13 @@ export function CompletionInvoiceDialog({
           </p>
           <div><Label className="text-xs">Description</Label><Input value={description} onChange={e => setDescription(e.target.value)} /></div>
           <div><Label className="text-xs">Amount (KES, before VAT) *</Label><Input type="number" min="0" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} /></div>
+          {requireFile && (
+            <div>
+              <Label className="text-xs">{fileLabel ?? "File"} *</Label>
+              <Input type="file" onChange={e => setFile(e.target.files?.[0] ?? null)} />
+              <p className="text-[11px] text-muted-foreground mt-1">Required before this can be registered as complete.</p>
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
