@@ -33,7 +33,6 @@ function TaxTypePage() {
   const [docCounts, setDocCounts] = useState<Record<string, number>>({});
   const [docsByReturn, setDocsByReturn] = useState<Record<string, any[]>>({});
   const [uploadingReceipt, setUploadingReceipt] = useState<string | null>(null);
-  const [uploadFor, setUploadFor] = useState<any>(null);
   const [invoices, setInvoices] = useState<Record<string, any>>({});
 
   async function load() {
@@ -77,9 +76,8 @@ function TaxTypePage() {
 
   async function setStatus(id: string, status: string, skipInvoice = false) {
     // Require proof of submission before a return can be marked filed.
-    const currentRow = rows.find((r: any) => r.id === id);
-    if (!skipInvoice && status === "filed" && currentRow?.status !== "filed" && !docCounts[id]) {
-      setUploadFor(currentRow);
+    if (status === "filed" && rows.find((r: any) => r.id === id)?.status !== "filed" && !docCounts[id]) {
+      toast.error("Upload the filing receipt in the Docs column before marking this return as filed.");
       return;
     }
     // A filing can't be marked filed until an invoice exists for it.
@@ -88,7 +86,7 @@ function TaxTypePage() {
       setInvoiceFor({
         id, clientName: row?.clients?.company_name,
         description: `${label} filing — period ending ${formatDate(row?.period_end)}`,
-        then: async () => { setInvoiceFor(null); setUploadFor(row); },
+        then: () => setStatus(id, status, true),
       });
       return;
     }
@@ -121,10 +119,6 @@ function TaxTypePage() {
     } else {
       toast.success("Filing receipt uploaded");
       await load();
-      if (uploadFor?.id === row.id) {
-        setUploadFor(null);
-        await setStatus(row.id, "filed", true);
-      }
     }
     setUploadingReceipt(null);
   }
@@ -361,31 +355,8 @@ function TaxTypePage() {
           sourceId={invoiceFor.id}
           clientName={invoiceFor.clientName}
           defaultDescription={invoiceFor.description}
-          onInvoiced={async () => { await invoiceFor.then(); }}
+          onInvoiced={async () => { await invoiceFor.then(); setInvoiceFor(null); }}
         />
-      )}
-      {uploadFor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-lg border bg-background p-5 shadow-lg">
-            <h2 className="text-base font-semibold">Upload proof of filing</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Upload the filing receipt or confirmation for {label} — period ending {formatDate(uploadFor.period_end)}. The return will be marked Filed after the upload succeeds.
-            </p>
-            <input
-              type="file"
-              className="mt-4 block w-full text-sm"
-              disabled={uploadingReceipt === uploadFor.id}
-              onChange={e => {
-                const file = e.currentTarget.files?.[0];
-                if (file) uploadReceipt(uploadFor, file);
-                e.currentTarget.value = "";
-              }}
-            />
-            <div className="mt-4 flex justify-end">
-              <button type="button" className="rounded-md border px-3 py-2 text-sm" onClick={() => setUploadFor(null)} disabled={uploadingReceipt === uploadFor.id}>Cancel</button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );
