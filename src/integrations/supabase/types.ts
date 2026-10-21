@@ -1202,6 +1202,9 @@ export type Database = {
           reliever_decision_notes: string | null
           start_date: string
           status: string
+          transferred_tasks_count: number
+          transferred_tax_returns_count: number
+          transferred_milestones_count: number
         }
         Insert: {
           created_at?: string
@@ -1220,6 +1223,9 @@ export type Database = {
           reliever_decision_notes?: string | null
           start_date: string
           status?: string
+          transferred_tasks_count?: number
+          transferred_tax_returns_count?: number
+          transferred_milestones_count?: number
         }
         Update: {
           created_at?: string
@@ -1238,6 +1244,9 @@ export type Database = {
           reliever_decision_notes?: string | null
           start_date?: string
           status?: string
+          transferred_tasks_count?: number
+          transferred_tax_returns_count?: number
+          transferred_milestones_count?: number
         }
         Relationships: [
           {
