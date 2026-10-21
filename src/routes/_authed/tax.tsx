@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useLiveRefresh } from "@/hooks/use-live-refresh";
 import { toast } from "sonner";
-import { AlertTriangle, Clock, UserX, LayoutGrid, Check, ChevronDown, ChevronUp, Download, Upload, FileText, Trash2 } from "lucide-react";
+import { AlertTriangle, Clock, UserX, LayoutGrid, Check, ChevronDown, ChevronUp, Download, Upload, FileText } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { CompletionInvoiceDialog } from "@/components/completion-invoice-dialog";
 import { daysUntil, periodsOverdue, formatDate, formatDateTime } from "@/lib/format";
@@ -50,7 +50,6 @@ function TaxPage() {
   const [documentsByReturn, setDocumentsByReturn] = useState<Map<string, any[]>>(new Map());
   const [invoicesById, setInvoicesById] = useState<Map<string, any>>(new Map());
   const [uploadingReceipt, setUploadingReceipt] = useState<string | null>(null);
-  const [deletingDocument, setDeletingDocument] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyCell, setBusyCell] = useState<string | null>(null);
   const [invoiceFor, setInvoiceFor] = useState<{ id: string; clientId: string; clientName?: string | null; description: string; needsReceipt: boolean } | null>(null);
@@ -365,41 +364,6 @@ function TaxPage() {
     else window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   }
 
-  async function deleteFilingDocument(doc: any) {
-    if (!doc?.id || !doc?.file_path || !doc?.tax_return_id || !doc?.client_id) {
-      toast.error("This filing document is missing required file information.");
-      return;
-    }
-    const expectedPrefix = `${doc.client_id}/tax-returns/${doc.tax_return_id}/`;
-    if (!String(doc.file_path).startsWith(expectedPrefix)) {
-      toast.error("This file is not stored in the expected tax-filing folder. It was not deleted.");
-      return;
-    }
-    const confirmed = window.confirm(`Permanently delete “${doc.title || "Filing receipt"}” from storage? This cannot be undone.`);
-    if (!confirmed) return;
-
-    setDeletingDocument(doc.id);
-    // Remove the real Storage object first. Keep the database row if Storage deletion fails.
-    const { error: storageError } = await supabase.storage.from("client-documents").remove([doc.file_path]);
-    if (storageError) {
-      toast.error(`Could not delete the stored file: ${storageError.message}`);
-      setDeletingDocument(null);
-      return;
-    }
-
-    const { error: recordError } = await supabase.from("documents").delete().eq("id", doc.id).eq("tax_return_id", doc.tax_return_id);
-    if (recordError) {
-      toast.error("The file was removed from storage, but its database record could not be removed. Contact an administrator to reconcile the record.");
-      await load(true);
-      setDeletingDocument(null);
-      return;
-    }
-
-    toast.success("Filing document permanently deleted");
-    await load(true);
-    setDeletingDocument(null);
-  }
-
   async function toggleObligation(clientId: string, taxType: string, next: boolean) {
     const key = `${clientId}:${taxType}`;
     setBusyCell(key);
@@ -690,11 +654,21 @@ function TaxPage() {
           <div className="bg-card border rounded-lg overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-muted/40 text-left text-xs text-muted-foreground border-b">
-                <tr><th className="py-2 px-3">Client</th><th className="py-2 px-3">Tax type</th><th className="py-2 px-3">Status</th><th className="py-2 px-3">Period ending</th><th className="py-2 px-3">Due date</th><th className="py-2 px-3">Assigned to</th><th className="py-2 px-3">Filed on</th><th className="py-2 px-3">Receipt / proof</th></tr>
+                <tr><th className="py-2 px-3">Client</th><th className="py-2 px-3">Tax type / filing date</th><th className="py-2 px-3">Status</th><th className="py-2 px-3">Period ending</th><th className="py-2 px-3">Due date</th><th className="py-2 px-3">Assigned to</th><th className="py-2 px-3">Filed on</th><th className="py-2 px-3">Receipt / proof</th></tr>
               </thead>
               <tbody>
                 {filteredReportRows.length === 0 && <tr><td colSpan={8} className="py-8 text-center text-muted-foreground">No obligations match this view.</td></tr>}
                 {filteredReportRows.map(row => (
+                  row.filed ? (
+                    <tr key={row.key} className="border-b last:border-0 hover:bg-muted/20">
+                      <td className="py-2 px-3 font-medium">{row.client.company_name}</td>
+                      <td colSpan={7} className="py-2 px-3 text-xs text-muted-foreground">
+                        <span className="font-medium text-foreground">{row.pol.label}</span>
+                        <span className="mx-2">·</span>
+                        {row.cur?.period_end ? formatDate(row.cur.period_end) : row.cur?.filed_at ? formatDate(row.cur.filed_at) : "Date not recorded"}
+                      </td>
+                    </tr>
+                  ) : (
                   <tr key={row.key} className="border-b last:border-0 hover:bg-muted/20">
                     <td className="py-1.5 px-3 font-medium">{row.client.company_name}</td>
                     <td className="py-1.5 px-3 text-xs text-muted-foreground">{row.pol.label}</td>
@@ -726,21 +700,9 @@ function TaxPage() {
                       {row.cur ? (
                         <div className="space-y-1.5">
                           {(documentsByReturn.get(row.cur.id) ?? []).map((doc: any) => (
-                            <div key={doc.id} className="flex items-center gap-1.5 max-w-[280px] rounded-md px-1.5 py-1 hover:bg-muted/60 group">
-                              <button type="button" onClick={() => downloadReceipt(doc.file_path)} className="flex min-w-0 flex-1 items-center gap-1 text-xs text-primary hover:underline text-left" title={doc.title}>
-                                <FileText className="h-3 w-3 shrink-0" /><span className="truncate">{doc.title || "Filing receipt"}</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => deleteFilingDocument(doc)}
-                                disabled={deletingDocument === doc.id}
-                                className="inline-flex shrink-0 items-center justify-center rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
-                                title="Delete filing document"
-                                aria-label={`Delete ${doc.title || "filing receipt"}`}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
+                            <button key={doc.id} type="button" onClick={() => downloadReceipt(doc.file_path)} className="flex items-center gap-1 text-xs text-primary hover:underline max-w-[240px]" title={doc.title}>
+                              <FileText className="h-3 w-3 shrink-0" /><span className="truncate">{doc.title || "Filing receipt"}</span>
+                            </button>
                           ))}
                           <label className={`inline-flex items-center gap-1 text-xs text-primary cursor-pointer hover:underline ${uploadingReceipt === row.cur.id ? "opacity-60" : ""}`}>
                             <Upload className="h-3 w-3" /> {uploadingReceipt === row.cur.id ? "Uploading…" : (documentsByReturn.get(row.cur.id)?.length ? "Add receipt" : "Upload receipt *")}
