@@ -9,6 +9,8 @@ ALTER TABLE public.leave_requests DROP CONSTRAINT IF EXISTS leave_requests_statu
 ALTER TABLE public.leave_requests ADD CONSTRAINT leave_requests_status_check
   CHECK (status IN ('pending', 'reliever_approved', 'approved', 'rejected', 'cancelled'));
 
+-- Idempotent policy replacement: safe if this migration was partially applied or rerun.
+DROP POLICY IF EXISTS "leave requests select leave workflow" ON public.leave_requests;
 DROP POLICY IF EXISTS "leave requests select self manager admin" ON public.leave_requests;
 CREATE POLICY "leave requests select leave workflow" ON public.leave_requests FOR SELECT TO authenticated
   USING (
