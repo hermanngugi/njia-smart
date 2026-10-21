@@ -28,7 +28,7 @@ function ClientsList() {
 
   async function load() {
     const [cRes, aRes, pRes] = await Promise.all([
-      supabase.from("clients").select("*").order("updated_at", { ascending: false }).order("created_at", { ascending: false }).order("company_name", { ascending: true }),
+      supabase.from("clients").select("*").order("company_name", { ascending: true }),
       supabase.from("client_assignments").select("client_id, user_id"),
       supabase.from("profiles").select("id, full_name"),
     ]);
@@ -60,11 +60,21 @@ function ClientsList() {
     else { toast.success("Client added"); setOpen(false); setForm({ client_type:"company", company_name:"", first_name:"", last_name:"", id_number:"", kra_pin:"", reg_number:"", industry:"", email:"", phone:"", engagement_type:"", notes:"" }); load(); }
   }
 
-  const filtered = useMemo(() => rows.filter(r =>
-    (typeFilter === "all" || (r.client_type ?? "company") === typeFilter) &&
-    (stateFilter === "all" || (stateFilter === "paused" ? r.is_paused : !r.is_paused)) &&
-    clientMatches(r, q.trim())
-  ), [rows, typeFilter, stateFilter, q]);
+  const filtered = useMemo(() => rows
+    .filter(r =>
+      (typeFilter === "all" || (r.client_type ?? "company") === typeFilter) &&
+      (stateFilter === "all" || (stateFilter === "paused" ? r.is_paused : !r.is_paused)) &&
+      clientMatches(r, q.trim())
+    )
+    .sort((a, b) => {
+      const nameForSort = (client: any) => {
+        if ((client.client_type ?? "company") === "individual") {
+          return [client.first_name, client.last_name].filter(Boolean).join(" ").trim() || client.company_name || "";
+        }
+        return client.company_name || "";
+      };
+      return nameForSort(a).localeCompare(nameForSort(b), undefined, { sensitivity: "base", numeric: true });
+    }), [rows, typeFilter, stateFilter, q]);
 
   const pausedCount = rows.filter(r => r.is_paused).length;
 
