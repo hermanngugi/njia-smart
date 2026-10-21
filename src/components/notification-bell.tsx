@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Bell, Check } from "lucide-react";
+import { Bell, Check, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
@@ -44,9 +45,27 @@ export function NotificationBell() {
   const unread = items.filter(i => !i.read_at).length;
 
   async function markAll() {
-    await supabase.from("notifications").update({ read_at: new Date().toISOString() })
-      .eq("user_id", user!.id).is("read_at", null);
-    load();
+    if (!user) return;
+    const { error } = await supabase.from("notifications").update({ read_at: new Date().toISOString() })
+      .eq("user_id", user.id).is("read_at", null);
+    if (error) {
+      toast.error("Could not mark notifications as read");
+      return;
+    }
+    await load();
+    toast.success("All notifications marked as read");
+  }
+
+  async function clearAll() {
+    if (!user) return;
+    if (!window.confirm("Clear all your notifications? This cannot be undone.")) return;
+    const { error } = await supabase.from("notifications").delete().eq("user_id", user.id);
+    if (error) {
+      toast.error("Could not clear notifications");
+      return;
+    }
+    setItems([]);
+    toast.success("Notifications cleared");
   }
   async function markOne(id: string) {
     if (!user) return;
@@ -77,7 +96,10 @@ export function NotificationBell() {
         <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-auto bg-card border rounded-lg shadow-lg z-50">
           <div className="flex items-center justify-between p-3 border-b">
             <div className="font-semibold text-sm">Notifications</div>
-            {unread > 0 && <button onClick={markAll} className="text-xs text-primary hover:underline">Mark all read</button>}
+            <div className="flex items-center gap-3">
+              {unread > 0 && <button onClick={() => void markAll()} className="text-xs text-primary hover:underline">Mark all read</button>}
+              {items.length > 0 && <button onClick={() => void clearAll()} className="flex items-center gap-1 text-xs text-destructive hover:underline" title="Clear all notifications"><Trash2 className="h-3 w-3" />Clear</button>}
+            </div>
           </div>
           {items.length === 0 ? (
             <div className="p-6 text-center text-sm text-muted-foreground">No notifications</div>
