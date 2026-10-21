@@ -26,7 +26,7 @@ function HrRoute() {
   return <HrPage />;
 }
 
-const TABS = ["Directory", "My Leave", "Approvals", "Payslips"] as const;
+const TABS = ["Directory", "My Leave", "Approvals", "Leave Records", "Payslips"] as const;
 
 type GenderFilter = "all" | "female" | "male" | "unset";
 
@@ -51,6 +51,7 @@ function HrPage() {
   const [myRequests, setMyRequests] = useState<any[]>([]);
   const [myBalances, setMyBalances] = useState<any[]>([]);
   const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
+  const [leaveRecords, setLeaveRecords] = useState<any[]>([]);
   const [myPayslips, setMyPayslips] = useState<any[]>([]);
 
   const [loading, setLoading] = useState(true);
@@ -78,6 +79,7 @@ function HrPage() {
     setLeaveTypes(lt.data ?? []);
     setMyBalances((bal.data ?? []).filter((b: any) => b.employee_id === user?.id));
     setMyRequests((lr.data ?? []).filter((r: any) => r.employee_id === user?.id));
+    setLeaveRecords((lr.data ?? []).filter((r: any) => ["approved", "rejected"].includes(r.status)));
     setPendingApprovals((lr.data ?? []).filter((r: any) => {
       if (r.employee_id === user?.id) return false;
       if (r.status === "pending") return r.reliever_id === user?.id || isAdmin;
@@ -168,9 +170,9 @@ function HrPage() {
       </div>
 
       <div className="flex flex-wrap gap-1 border-b">
-        {TABS.filter(t => (t !== "Approvals" || canApproveAny) && (t !== "Directory" || isHrMgr)).map(t => (
+        {TABS.filter(t => (t !== "Approvals" || canApproveAny) && (t !== "Directory" || isHrMgr) && (t !== "Leave Records" || isHrMgr || isAdmin || isDirector)).map(t => (
           <button key={t} onClick={() => setTab(t)} className={`px-3 py-2 text-sm border-b-2 transition-colors ${tab === t ? "border-primary text-primary font-medium" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-            {t}{t === "Approvals" && pendingApprovals.length > 0 ? ` (${pendingApprovals.length})` : ""}
+            {t}{t === "Approvals" && pendingApprovals.length > 0 ? ` (${pendingApprovals.length})` : ""}{t === "Leave Records" ? ` (${leaveRecords.length})` : ""}
           </button>
         ))}
       </div>
@@ -276,10 +278,10 @@ function HrPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-muted/40 text-left text-xs text-muted-foreground border-b">
-                <tr><th className="py-2 px-3">Employee</th><th>Type</th><th>Dates</th><th>Days</th><th>Reason</th><th className="w-64"></th></tr>
+                <tr><th className="py-2 px-3">Employee</th><th>Type</th><th>Dates</th><th>Days</th><th>Reason</th><th>Reliever</th><th>Client work transferred</th><th className="w-64"></th></tr>
               </thead>
               <tbody>
-                {pendingApprovals.length === 0 && <tr><td colSpan={6} className="py-10 text-center text-muted-foreground">No pending requests.</td></tr>}
+                {pendingApprovals.length === 0 && <tr><td colSpan={8} className="py-10 text-center text-muted-foreground">No pending requests.</td></tr>}
                 {pendingApprovals.map(r => (
                   <tr key={r.id} className="border-b last:border-0 align-top">
                     <td className="py-2 px-3">{r.profiles?.full_name || "—"}</td>
@@ -287,6 +289,8 @@ function HrPage() {
                     <td className="text-xs">{formatDate(r.start_date)} – {formatDate(r.end_date)}</td>
                     <td>{r.days}</td>
                     <td className="text-xs text-muted-foreground max-w-[12rem] truncate">{r.reason || "—"}<div className="mt-1 font-medium text-primary">{r.status === "reliever_approved" ? "Director approval" : "Reliever review"}</div></td>
+                    <td>{profiles.find(p => p.id === r.reliever_id)?.full_name || "—"}</td>
+                    <td className="text-xs">{r.status === "reliever_approved" || r.status === "approved" ? `${r.transferred_tasks_count ?? 0} tasks, ${r.transferred_tax_returns_count ?? 0} tax returns, ${r.transferred_milestones_count ?? 0} milestones` : "Pending reliever review"}</td>
                     <td className="py-2 pr-3">
                       <div className="flex flex-col gap-1">
                         <input
@@ -305,6 +309,47 @@ function HrPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {!loading && tab === "Leave Records" && (isHrMgr || isAdmin || isDirector) && (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="font-semibold">Approved / declined leave requests</h2>
+              <p className="text-xs text-muted-foreground">Records include the reliever and client-work handover totals for audit purposes.</p>
+            </div>
+            <button onClick={() => downloadLeaveRecordsCsv(leaveRecords, profiles, leaveTypes)} className="h-9 px-3 rounded-md border text-sm inline-flex items-center gap-2">
+              <Download className="h-4 w-4" /> Export CSV
+            </button>
+          </div>
+          <div className="bg-card border rounded-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/40 text-left text-xs text-muted-foreground border-b">
+                  <tr><th className="py-2 px-3">Employee</th><th>Reliever</th><th>Leave type</th><th>Dates</th><th>Days</th><th>Client tasks transferred</th><th>Tax returns transferred</th><th>Service milestones transferred</th><th>Final status</th><th>Decision date</th><th>Decision notes</th></tr>
+                </thead>
+                <tbody>
+                  {leaveRecords.length === 0 && <tr><td colSpan={11} className="py-10 text-center text-muted-foreground">No approved or declined leave requests yet.</td></tr>}
+                  {leaveRecords.map(r => (
+                    <tr key={r.id} className="border-b last:border-0 align-top">
+                      <td className="py-2 px-3">{profiles.find(p => p.id === r.employee_id)?.full_name || r.profiles?.full_name || "—"}</td>
+                      <td>{profiles.find(p => p.id === r.reliever_id)?.full_name || "—"}</td>
+                      <td>{leaveTypes.find(t => t.id === r.leave_type_id)?.name || "—"}</td>
+                      <td className="whitespace-nowrap text-xs">{formatDate(r.start_date)} – {formatDate(r.end_date)}</td>
+                      <td>{r.days}</td>
+                      <td>{r.transferred_tasks_count ?? 0}</td>
+                      <td>{r.transferred_tax_returns_count ?? 0}</td>
+                      <td>{r.transferred_milestones_count ?? 0}</td>
+                      <td><StatusBadge status={r.status} /></td>
+                      <td className="whitespace-nowrap text-xs">{r.decided_at ? new Date(r.decided_at).toLocaleString("en-KE") : "—"}</td>
+                      <td className="text-xs max-w-[14rem]">{r.decision_notes || r.reliever_decision_notes || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
@@ -368,6 +413,31 @@ function HrPage() {
       )}
     </div>
   );
+}
+
+function downloadLeaveRecordsCsv(records: any[], profiles: any[], leaveTypes: any[]) {
+  const headers = ["Employee", "Employee ID", "Reliever", "Reliever ID", "Leave Type", "Start Date", "End Date", "Days", "Status", "Reason", "Reliever Decision Notes", "Director/Admin Decision Notes", "Client Tasks Transferred", "Tax Returns Transferred", "Service Milestones Transferred", "Decision Date", "Request Date"];
+  const escape = (value: unknown) => {
+    const text = value == null ? "" : String(value);
+    return `"${text.replace(/"/g, '""')}"`;
+  };
+  const rows = records.map(r => [
+    profiles.find(p => p.id === r.employee_id)?.full_name || r.profiles?.full_name || "", r.employee_id,
+    profiles.find(p => p.id === r.reliever_id)?.full_name || "", r.reliever_id,
+    leaveTypes.find(t => t.id === r.leave_type_id)?.name || "", r.start_date, r.end_date, r.days, r.status, r.reason,
+    r.reliever_decision_notes, r.decision_notes, r.transferred_tasks_count ?? 0, r.transferred_tax_returns_count ?? 0,
+    r.transferred_milestones_count ?? 0, r.decided_at, r.created_at,
+  ]);
+  const csv = [headers, ...rows].map(row => row.map(escape).join(",")).join("\r\n");
+  const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `hr-leave-records-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function StatusBadge({ status }: { status: string }) {
