@@ -208,7 +208,7 @@ function Dashboard() {
       </div>
       )}
 
-      <IctDeskCard />
+      {!isDirector && <IctDeskCard />}
 
       {/* My day — what this person specifically needs to look at */}
       <div className="grid gap-4 lg:grid-cols-2">
