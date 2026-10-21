@@ -45,6 +45,13 @@ function ClientDetail() {
 
   async function load() {
     const { data } = await supabase.from("clients").select("*").eq("id", id).maybeSingle();
+    // Non-admin users must not be able to open a paused client through a saved/direct URL.
+    if (!data || ((data as any).is_paused && !isAdmin)) {
+      setClient(null);
+      setRelated({ tax: [], engagements: [], advisory: [], docs: [], tasks: [], contacts: [] });
+      if (!isAdmin) navigate({ to: "/clients", replace: true });
+      return;
+    }
     setClient(data);
     const updaterId = (data as any)?.portal_password_updated_by;
     const recordUpdaterId = (data as any)?.updated_by;
@@ -68,9 +75,10 @@ function ClientDetail() {
     setTaxPolicies((pols.data as any[]) ?? []);
     setObligations(obl.data ?? []);
   }
-  useEffect(() => { load(); }, [id]);
+  useEffect(() => { load(); }, [id, isAdmin]);
 
   async function setPaused(paused: boolean) {
+    if (!isAdmin) { toast.error("Only an Admin or Director can activate or deactivate clients"); return; }
     const { data: { user } } = await supabase.auth.getUser();
     const { error } = await supabase.from("clients").update(
       paused ? { is_paused: true, paused_at: new Date().toISOString(), paused_by: user?.id ?? null } as any
@@ -242,10 +250,10 @@ function ClientDetail() {
                   ? "bg-muted text-muted-foreground border-muted-foreground/30 hover:bg-muted/70"
                   : "bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-200 dark:border-emerald-800"
               }`}
-              title={(client as any).is_paused ? "Click to activate client" : "Click to deactivate client"}
+              title={(client as any).is_paused ? "Click to mark active" : "Click to mark inactive"}
             >
               {(client as any).is_paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
-              {(client as any).is_paused ? "Activate client" : "Deactivate client"}
+              {(client as any).is_paused ? "Inactive" : "Active"}
             </button>}
             <Button variant="outline" size="sm" onClick={openEdit}><Pencil className="h-3.5 w-3.5 mr-1" />Edit</Button>
             {isAdmin && (
