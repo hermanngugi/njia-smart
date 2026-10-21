@@ -712,7 +712,7 @@ function TaxPage() {
                       ) : <span className="text-xs text-muted-foreground">No filing period</span>}
                     </td>
                   </tr>
-                ))}
+                )))}
               </tbody>
             </table>
           </div>
