@@ -3,14 +3,15 @@ import { useRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
-import { playNotificationSound } from "@/lib/sound";
+import { playIctRequestSound, playNotificationSound } from "@/lib/sound";
 
 type NotificationRow = { id: string; type: string; title: string; body: string | null; link: string | null };
 
 /**
  * Mounted once in AppShell so a sound + a short-lived toast popup fire for
  * a brand-new notification row no matter which page you're on - chat
- * messages and deadline reminders included.
+ * messages and deadline reminders included. New ICT Service Desk requests use a
+ * separate, more noticeable alarm; critical ICT requests use a longer alarm.
  *
  * Deadline reminders (type "deadline_reminder", written by the database
  * when something assigned to you is due within 3 days) get a warning toast
@@ -28,13 +29,16 @@ export function useNotificationSound() {
       .channel("notif-sound-" + user.id)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
         (payload) => {
-          playNotificationSound();
           const n = payload.new as NotificationRow;
           const isDeadline = n.type === "deadline_reminder";
-          const show = isDeadline ? toast.warning : toast;
+          const isIctRequest = n.type === "ict_ticket";
+          const isCriticalIct = isIctRequest && n.title.toUpperCase().startsWith("CRITICAL");
+          if (isIctRequest) playIctRequestSound(isCriticalIct);
+          else playNotificationSound();
+          const show = isCriticalIct ? toast.error : (isDeadline || isIctRequest ? toast.warning : toast);
           show(n.title, {
             description: n.body ?? undefined,
-            duration: isDeadline ? 12000 : 6000,
+            duration: isCriticalIct ? 18000 : isDeadline || isIctRequest ? 14000 : 6000,
             // In-app navigation - no full page reload.
             action: n.link
               ? { label: "View", onClick: () => router.history.push(n.link as string) }
