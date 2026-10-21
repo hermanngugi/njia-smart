@@ -63,11 +63,26 @@ function AnnouncePage() {
     if (error) toast.error(error.message); else { toast.success("Deleted"); load(); }
   }
 
+  async function removeAll() {
+    if (!canManageAnnouncements || rows.length === 0) return;
+    if (!confirm(`Delete all ${rows.length} announcements? This cannot be undone.`)) return;
+    const { error } = await supabase.from("announcements").delete().not("id", "is", null);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setRows([]);
+    toast.success("All announcements deleted");
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <div><h1 className="text-2xl font-bold">Announcements</h1><p className="text-sm text-muted-foreground">Office-wide updates and alerts.</p></div>
-        {canManageAnnouncements && <button onClick={openNew} className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm inline-flex items-center gap-2"><Plus className="h-4 w-4" /> New post</button>}
+        {canManageAnnouncements && <div className="flex items-center gap-2">
+          {rows.length > 0 && <button onClick={() => void removeAll()} className="h-9 px-3 rounded-md border border-destructive/40 text-destructive text-sm inline-flex items-center gap-2 hover:bg-destructive/5"><Trash2 className="h-4 w-4" /> Delete all</button>}
+          <button onClick={openNew} className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm inline-flex items-center gap-2"><Plus className="h-4 w-4" /> New post</button>
+        </div>}
       </div>
       <div className="space-y-3">
         {rows.length === 0 && <div className="bg-card border rounded-lg p-8 text-center text-muted-foreground text-sm">No announcements yet.</div>}
