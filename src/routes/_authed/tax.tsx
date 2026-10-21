@@ -269,6 +269,35 @@ function TaxPage() {
     [assigneeScopedReportRows, reportFilter]
   );
 
+  // Filing Record is presented client-first, with one column per recent calendar month.
+  // Older and undated records remain available in a separate column rather than disappearing.
+  const filingMonths = useMemo(() => {
+    const now = new Date();
+    return Array.from({ length: 6 }, (_, index) => {
+      const date = new Date(now.getFullYear(), now.getMonth() - index, 1);
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      return { key, label: date.toLocaleDateString(undefined, { month: "short", year: "2-digit" }) };
+    });
+  }, []);
+
+  const groupedFilingRows = useMemo(() => {
+    const groups = new Map<string, { client: any; months: Map<string, any[]>; older: any[] }>();
+    const monthKeys = new Set(filingMonths.map(month => month.key));
+    filteredReportRows.forEach(row => {
+      if (!groups.has(row.client.id)) groups.set(row.client.id, { client: row.client, months: new Map(), older: [] });
+      const group = groups.get(row.client.id)!;
+      const dateValue = row.cur?.period_end || row.cur?.filed_at || row.cur?.due_date || null;
+      const key = dateValue ? String(dateValue).slice(0, 7) : "";
+      if (monthKeys.has(key)) {
+        if (!group.months.has(key)) group.months.set(key, []);
+        group.months.get(key)!.push(row);
+      } else {
+        group.older.push(row);
+      }
+    });
+    return [...groups.values()].sort((a, b) => String(a.client.company_name || "").localeCompare(String(b.client.company_name || ""), undefined, { sensitivity: "base", numeric: true }));
+  }, [filteredReportRows, filingMonths]);
+
   function downloadReportCsv(statusFilter: "all" | "filed" | "not_filed" = reportFilter) {
     // Export from the same report data as the table, but apply the requested
     // status explicitly so the Not filed button can never export Filed rows.
@@ -652,59 +681,67 @@ function TaxPage() {
           </div>
 
           <div className="bg-card border rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/40 text-left text-xs text-muted-foreground border-b">
-                <tr><th className="py-2 px-3">Client</th><th className="py-2 px-3">Tax type</th><th className="py-2 px-3">Status</th><th className="py-2 px-3">Period ending</th><th className="py-2 px-3">Due date</th><th className="py-2 px-3">Assigned to</th><th className="py-2 px-3">Filed on</th><th className="py-2 px-3">Receipt / proof</th></tr>
-              </thead>
-              <tbody>
-                {filteredReportRows.length === 0 && <tr><td colSpan={8} className="py-8 text-center text-muted-foreground">No obligations match this view.</td></tr>}
-                {filteredReportRows.map(row => (
-                  <tr key={row.key} className="border-b last:border-0 hover:bg-muted/20">
-                    <td className="py-1.5 px-3 font-medium">{row.client.company_name}</td>
-                    <td className="py-1.5 px-3 text-xs text-muted-foreground">{row.pol.label}</td>
-                    <td className="py-1.5 px-3">
-                      {row.filed ? (
-                        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"><Check className="h-3 w-3" /> Filed</span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-100">Not filed</span>
-                      )}
-                    </td>
-                    <td className="py-1.5 px-3 text-xs">{row.cur?.period_end ? formatDate(row.cur.period_end) : "—"}</td>
-                    <td className="py-1.5 px-3 text-xs">{row.cur?.due_date ? formatDate(row.cur.due_date) : "—"}</td>
-                    <td className="py-1.5 px-3 text-xs">
-                      {(() => {
-                        const ids = [row.cur?.assigned_to, ...(row.cur ? collabByReturn.get(row.cur.id) ?? [] : [])].filter(Boolean) as string[];
-                        const names = [...new Set(ids)].map(id => staffMap.get(id) ?? "Unknown");
-                        return names.length ? names.join(", ") : <span className="text-muted-foreground">Unassigned</span>;
-                      })()}
-                    </td>
-                    <td className="py-1.5 px-3 text-xs text-muted-foreground">
-                      {row.filed && row.cur?.filed_at ? (
-                        <>
-                          <div>{formatDateTime(row.cur.filed_at)}</div>
-                          {row.cur.filed_by && staffMap.get(row.cur.filed_by) && <div className="text-[10px]">by {staffMap.get(row.cur.filed_by)}</div>}
-                        </>
-                      ) : "—"}
-                    </td>
-                    <td className="py-1.5 px-3 min-w-[220px]">
-                      {row.cur ? (
-                        <div className="space-y-1.5">
-                          {(documentsByReturn.get(row.cur.id) ?? []).map((doc: any) => (
-                            <button key={doc.id} type="button" onClick={() => downloadReceipt(doc.file_path)} className="flex items-center gap-1 text-xs text-primary hover:underline max-w-[240px]" title={doc.title}>
-                              <FileText className="h-3 w-3 shrink-0" /><span className="truncate">{doc.title || "Filing receipt"}</span>
-                            </button>
-                          ))}
-                          <label className={`inline-flex items-center gap-1 text-xs text-primary cursor-pointer hover:underline ${uploadingReceipt === row.cur.id ? "opacity-60" : ""}`}>
-                            <Upload className="h-3 w-3" /> {uploadingReceipt === row.cur.id ? "Uploading…" : (documentsByReturn.get(row.cur.id)?.length ? "Add receipt" : "Upload receipt *")}
-                            <input type="file" className="hidden" disabled={uploadingReceipt === row.cur.id} onChange={e => { const file = e.target.files?.[0]; if (file) uploadReceipt(row.cur.id, row.client.id, file); e.currentTarget.value = ""; }} />
-                          </label>
-                        </div>
-                      ) : <span className="text-xs text-muted-foreground">No filing period</span>}
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1180px] text-sm">
+                <thead className="bg-muted/40 text-left text-xs text-muted-foreground border-b">
+                  <tr>
+                    <th className="py-3 px-3 sticky left-0 bg-muted/95 z-10 min-w-[200px]">Client</th>
+                    {filingMonths.map(month => <th key={month.key} className="py-3 px-3 min-w-[190px]">{month.label}</th>)}
+                    <th className="py-3 px-3 min-w-[190px]">Older / undated</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {groupedFilingRows.length === 0 && <tr><td colSpan={8} className="py-8 text-center text-muted-foreground">No obligations match this view.</td></tr>}
+                  {groupedFilingRows.map(group => {
+                    const renderRecords = (records: any[]) => records.length ? (
+                      <div className="space-y-2">
+                        {records.map(row => (
+                          <div key={row.key} className="rounded-md border bg-background/80 p-2 space-y-1.5">
+                            <div className="flex items-start justify-between gap-2">
+                              <span className="text-xs font-semibold leading-4">{row.pol.label}</span>
+                              {row.filed ? (
+                                <span className="inline-flex shrink-0 items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"><Check className="h-3 w-3" /> Filed</span>
+                              ) : (
+                                <span className="inline-flex shrink-0 items-center text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-100">Not filed</span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-muted-foreground space-y-0.5">
+                              <div>Period end: <span className="text-foreground">{row.cur?.period_end ? formatDate(row.cur.period_end) : "—"}</span></div>
+                              <div>Due: <span className="text-foreground">{row.cur?.due_date ? formatDate(row.cur.due_date) : "—"}</span></div>
+                              {row.filed && row.cur?.filed_at && <div>Filed: <span className="text-foreground">{formatDate(row.cur.filed_at)}</span></div>}
+                              {(() => {
+                                const ids = [row.cur?.assigned_to, ...(row.cur ? collabByReturn.get(row.cur.id) ?? [] : [])].filter(Boolean) as string[];
+                                const names = [...new Set(ids)].map(id => staffMap.get(id) ?? "Unknown");
+                                return <div>Assigned: <span className="text-foreground">{names.length ? names.join(", ") : "Unassigned"}</span></div>;
+                              })()}
+                            </div>
+                            {row.cur && <div className="pt-1 border-t space-y-1">
+                              {(documentsByReturn.get(row.cur.id) ?? []).map((doc: any) => (
+                                <button key={doc.id} type="button" onClick={() => downloadReceipt(doc.file_path)} className="flex items-center gap-1 text-[11px] text-primary hover:underline max-w-full" title={doc.title}>
+                                  <FileText className="h-3 w-3 shrink-0" /><span className="truncate">{doc.title || "Filing receipt"}</span>
+                                </button>
+                              ))}
+                              <label className={`inline-flex items-center gap-1 text-[11px] text-primary cursor-pointer hover:underline ${uploadingReceipt === row.cur.id ? "opacity-60" : ""}`}>
+                                <Upload className="h-3 w-3" /> {uploadingReceipt === row.cur.id ? "Uploading…" : (documentsByReturn.get(row.cur.id)?.length ? "Add receipt" : "Upload receipt *")}
+                                <input type="file" className="hidden" disabled={uploadingReceipt === row.cur.id} onChange={e => { const file = e.target.files?.[0]; if (file) uploadReceipt(row.cur.id, row.client.id, file); e.currentTarget.value = ""; }} />
+                              </label>
+                            </div>}
+                            {!row.cur && <div className="text-[11px] text-muted-foreground">No filing period scheduled</div>}
+                          </div>
+                        ))}
+                      </div>
+                    ) : <span className="text-xs text-muted-foreground">—</span>;
+                    return (
+                      <tr key={group.client.id} className="border-b last:border-0 align-top hover:bg-muted/10">
+                        <td className="py-3 px-3 font-semibold sticky left-0 bg-card z-[1] border-r">{group.client.company_name}</td>
+                        {filingMonths.map(month => <td key={month.key} className="p-2 align-top">{renderRecords(group.months.get(month.key) ?? [])}</td>)}
+                        <td className="p-2 align-top">{renderRecords(group.older)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
           <p className="text-xs text-muted-foreground">Feeds straight from the checklist — each obligated client's open period, plus every period already filed with the date it was filed. Filter by type, client, or assignee above. A receipt/proof of submission must be uploaded before a return can be marked filed; click a receipt name to download it.</p>
         </div>
