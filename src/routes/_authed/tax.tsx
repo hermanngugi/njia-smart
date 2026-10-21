@@ -331,22 +331,24 @@ function TaxPage() {
 
   async function clearClientFilingRecords() {
     if (!isAdmin) {
-      toast.error("Only Admin or Director can clear a client's filing records.");
+      toast.error("Only Admin or Director can clear filing records.");
       return;
     }
-    const client = clients.find((item: any) => item.id === clearRecordsClientId);
-    if (!client) {
-      toast.error("Select a client first.");
+    const clearAll = clearRecordsClientId === "__all__";
+    const client = clearAll ? null : clients.find((item: any) => item.id === clearRecordsClientId);
+    if (!clearAll && !client) {
+      toast.error("Select a client or choose All first.");
       return;
     }
-    const clientReturns = returns.filter((item: any) => item.client_id === client.id);
-    if (clientReturns.length === 0) {
-      toast.info("This client has no filing records to clear.");
+    const targetReturns = clearAll ? returns : returns.filter((item: any) => item.client_id === client!.id);
+    if (targetReturns.length === 0) {
+      toast.info(clearAll ? "There are no filing records to clear." : "This client has no filing records to clear.");
       return;
     }
-    const returnIds = clientReturns.map((item: any) => item.id);
+    const returnIds = targetReturns.map((item: any) => item.id);
     const docs = returnIds.flatMap((id: string) => documentsByReturn.get(id) ?? []);
-    const message = `Permanently clear ${clientReturns.length} filing record(s) and ${docs.length} linked document(s) for ${client.company_name}? Actual files will be removed from Storage. The client profile, tax obligations, and invoices will be kept. Active obligations may generate fresh current filing records.`;
+    const targetName = clearAll ? "ALL clients" : client!.company_name;
+    const message = `PERMANENTLY clear ${targetReturns.length} filing record(s) and ${docs.length} linked document(s) for ${targetName}? Actual files will be removed from Storage. Client profiles, tax obligations, and invoices will be kept. Active obligations may generate fresh current filing records.`;
     if (!window.confirm(message)) return;
 
     setClearingRecords(true);
@@ -377,14 +379,16 @@ function TaxPage() {
         return;
       }
 
-      const { error: returnsError } = await supabase.from("tax_returns").delete().eq("client_id", client.id);
+      const { error: returnsError } = clearAll
+        ? await supabase.from("tax_returns").delete().in("id", returnIds)
+        : await supabase.from("tax_returns").delete().eq("client_id", client!.id);
       if (returnsError) {
         toast.error(`Documents were removed, but filing records could not be cleared: ${returnsError.message}`);
         await load(true);
         return;
       }
 
-      toast.success(`Cleared filing records for ${client.company_name}.`);
+      toast.success(clearAll ? `Cleared filing records for all clients (${targetReturns.length} records).` : `Cleared filing records for ${client!.company_name}.`);
       setClearRecordsClientId("");
       await load(true);
     } catch (error: any) {
@@ -707,10 +711,11 @@ function TaxPage() {
                   value={clearRecordsClientId}
                   onChange={e => setClearRecordsClientId(e.target.value)}
                   disabled={clearingRecords}
-                  aria-label="Select client whose filing records to clear"
+                  aria-label="Select a client or all clients whose filing records to clear"
                   className="h-9 min-w-[190px] rounded-md border bg-background px-3 text-sm"
                 >
                   <option value="">Clear records for client…</option>
+                  <option value="__all__">All clients — clear all filing records</option>
                   {[...clients].sort((a: any, b: any) => (a.company_name || "").localeCompare(b.company_name || "", undefined, { sensitivity: "base", numeric: true })).map((client: any) => (
                     <option key={client.id} value={client.id}>{client.company_name}</option>
                   ))}
