@@ -45,13 +45,6 @@ function ClientDetail() {
 
   async function load() {
     const { data } = await supabase.from("clients").select("*").eq("id", id).maybeSingle();
-    // Non-admin users must not be able to open a paused client through a saved/direct URL.
-    if (!data || ((data as any).is_paused && !isAdmin)) {
-      setClient(null);
-      setRelated({ tax: [], engagements: [], advisory: [], docs: [], tasks: [], contacts: [] });
-      if (!isAdmin) navigate({ to: "/clients", replace: true });
-      return;
-    }
     setClient(data);
     const updaterId = (data as any)?.portal_password_updated_by;
     const recordUpdaterId = (data as any)?.updated_by;
@@ -75,10 +68,9 @@ function ClientDetail() {
     setTaxPolicies((pols.data as any[]) ?? []);
     setObligations(obl.data ?? []);
   }
-  useEffect(() => { load(); }, [id, isAdmin]);
+  useEffect(() => { load(); }, [id]);
 
   async function setPaused(paused: boolean) {
-    if (!isAdmin) { toast.error("Only an Admin or Director can activate or deactivate clients"); return; }
     const { data: { user } } = await supabase.auth.getUser();
     const { error } = await supabase.from("clients").update(
       paused ? { is_paused: true, paused_at: new Date().toISOString(), paused_by: user?.id ?? null } as any
@@ -129,7 +121,9 @@ function ClientDetail() {
       document: { title: "" },
       task: { title: "", priority: "normal", due_date: "", description: "" },
     };
-    setAddForm(defaults[kind]);
+    setAddForm(kind === "tax"
+      ? { ...defaults.tax, return_types: obligations.filter((o: any) => o.active).map((o: any) => o.tax_type) }
+      : defaults[kind]);
     setAddFile(null);
     setAddOpen(kind);
   }
@@ -141,14 +135,32 @@ function ClientDetail() {
     try {
       if (addOpen === "tax") {
         const types: string[] = (addForm.return_types ?? []).filter(Boolean);
-        if (types.length === 0) throw new Error("Select at least one tax obligation");
+        if (types.length === 0 && !obligations.some((o: any) => o.active)) throw new Error("Select at least one tax obligation");
         // Due dates aren't picked here — each type's own policy (cadence + due
         // day, set by admins under Settings) decides when the first filing is due.
+        const existingTypes = obligations.filter((o: any) => o.active).map((o: any) => o.tax_type as string);
+        // Persist the selected obligations and deactivate any previously assigned
+        // types that were unchecked. Remove only unused pending periods; filed,
+        // in-progress, invoiced, and documented records are retained.
         for (const rt of types) {
+          if (existingTypes.includes(rt)) continue;
           const { error } = await supabase.rpc("set_client_tax_obligation", {
             _client_id: id, _tax_type: rt, _active: true,
           });
           if (error) throw error;
+        }
+        for (const rt of existingTypes.filter((t: string) => !types.includes(t))) {
+          const { error } = await supabase.rpc("set_client_tax_obligation", {
+            _client_id: id, _tax_type: rt, _active: false,
+          });
+          if (error) throw error;
+          const { error: cleanupError } = await supabase.from("tax_returns")
+            .delete()
+            .eq("client_id", id)
+            .eq("return_type", rt)
+            .eq("status", "pending")
+            .is("invoice_id", null);
+          if (cleanupError) throw cleanupError;
         }
       } else if (addOpen === "audit" || addOpen === "advisory") {
         if (!addForm.title?.trim()) throw new Error("Title required");
@@ -242,7 +254,7 @@ function ClientDetail() {
             <LastUpdated at={(client as any).updated_at} byName={recordUpdaterName} className="block mt-1" />
           </div>
           <div className="flex items-center gap-2">
-            {isAdmin && <button
+            <button
               type="button"
               onClick={() => setPaused(!(client as any).is_paused)}
               className={`h-9 px-3 rounded-md border text-sm font-medium inline-flex items-center gap-1.5 ${
@@ -254,7 +266,7 @@ function ClientDetail() {
             >
               {(client as any).is_paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
               {(client as any).is_paused ? "Inactive" : "Active"}
-            </button>}
+            </button>
             <Button variant="outline" size="sm" onClick={openEdit}><Pencil className="h-3.5 w-3.5 mr-1" />Edit</Button>
             {isAdmin && (
               <AlertDialog>
