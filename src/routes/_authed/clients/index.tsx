@@ -152,8 +152,10 @@ function ClientsList() {
       {selected.size > 0 && (
         <div className="shrink-0 bg-card border rounded-lg p-3 flex flex-wrap items-center gap-3">
           <span className="text-sm font-medium">{selected.size} selected</span>
-          <button disabled={bulkBusy} onClick={()=>bulkPause(true)} className="h-8 px-3 rounded-md border text-xs inline-flex items-center gap-1.5 hover:bg-muted disabled:opacity-50"><Pause className="h-3.5 w-3.5" />Pause</button>
-          <button disabled={bulkBusy} onClick={()=>bulkPause(false)} className="h-8 px-3 rounded-md border text-xs inline-flex items-center gap-1.5 hover:bg-muted disabled:opacity-50"><Play className="h-3.5 w-3.5" />Resume</button>
+          {isAdmin && <>
+            <button disabled={bulkBusy} onClick={()=>bulkPause(true)} className="h-8 px-3 rounded-md border text-xs inline-flex items-center gap-1.5 hover:bg-muted disabled:opacity-50"><Pause className="h-3.5 w-3.5" />Deactivate</button>
+            <button disabled={bulkBusy} onClick={()=>bulkPause(false)} className="h-8 px-3 rounded-md border text-xs inline-flex items-center gap-1.5 hover:bg-muted disabled:opacity-50"><Play className="h-3.5 w-3.5" />Activate</button>
+          </>}
           {isAdmin && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -215,9 +217,9 @@ function ClientsList() {
                     <td><span className={`text-xs px-2 py-1 rounded-full capitalize ${STATUS_COLORS[r.status]}`}>{statusLabel(r.status)}</span></td>
                     <td className="text-muted-foreground">{formatDate(r.created_at)}</td>
                     <td className="py-2 px-3 text-right whitespace-nowrap">
-                      <button onClick={()=>setPaused([r.id], !r.is_paused)} title={r.is_paused ? "Resume" : "Pause"} className="text-muted-foreground hover:text-foreground p-1">
+                      {isAdmin && <button onClick={()=>setPaused([r.id], !r.is_paused)} title={r.is_paused ? "Activate client" : "Deactivate client"} aria-label={r.is_paused ? "Activate client" : "Deactivate client"} className="text-muted-foreground hover:text-foreground p-1">
                         {r.is_paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
-                      </button>
+                      </button>}
                       {canDelete("clients", { createdBy: r.created_by }) && (
                         <AlertDialog>
                           <AlertDialogTrigger asChild>

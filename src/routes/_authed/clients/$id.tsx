@@ -234,7 +234,7 @@ function ClientDetail() {
             <LastUpdated at={(client as any).updated_at} byName={recordUpdaterName} className="block mt-1" />
           </div>
           <div className="flex items-center gap-2">
-            <button
+            {isAdmin && <button
               type="button"
               onClick={() => setPaused(!(client as any).is_paused)}
               className={`h-9 px-3 rounded-md border text-sm font-medium inline-flex items-center gap-1.5 ${
@@ -242,11 +242,11 @@ function ClientDetail() {
                   ? "bg-muted text-muted-foreground border-muted-foreground/30 hover:bg-muted/70"
                   : "bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-200 dark:border-emerald-800"
               }`}
-              title={(client as any).is_paused ? "Click to mark active" : "Click to mark inactive"}
+              title={(client as any).is_paused ? "Click to activate client" : "Click to deactivate client"}
             >
               {(client as any).is_paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
-              {(client as any).is_paused ? "Inactive" : "Active"}
-            </button>
+              {(client as any).is_paused ? "Activate client" : "Deactivate client"}
+            </button>}
             <Button variant="outline" size="sm" onClick={openEdit}><Pencil className="h-3.5 w-3.5 mr-1" />Edit</Button>
             {isAdmin && (
               <AlertDialog>
