@@ -1196,6 +1196,10 @@ export type Database = {
           id: string
           leave_type_id: string
           reason: string | null
+          reliever_id: string | null
+          reliever_decided_by: string | null
+          reliever_decided_at: string | null
+          reliever_decision_notes: string | null
           start_date: string
           status: string
         }
@@ -1210,6 +1214,10 @@ export type Database = {
           id?: string
           leave_type_id: string
           reason?: string | null
+          reliever_id?: string | null
+          reliever_decided_by?: string | null
+          reliever_decided_at?: string | null
+          reliever_decision_notes?: string | null
           start_date: string
           status?: string
         }
@@ -1224,6 +1232,10 @@ export type Database = {
           id?: string
           leave_type_id?: string
           reason?: string | null
+          reliever_id?: string | null
+          reliever_decided_by?: string | null
+          reliever_decided_at?: string | null
+          reliever_decision_notes?: string | null
           start_date?: string
           status?: string
         }
@@ -1247,6 +1259,20 @@ export type Database = {
             columns: ["leave_type_id"]
             isOneToOne: false
             referencedRelation: "leave_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_requests_reliever_id_fkey"
+            columns: ["reliever_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_requests_reliever_decided_by_fkey"
+            columns: ["reliever_decided_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1892,6 +1918,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      request_leave: {
+        Args: { _leave_type_id: string; _start_date: string; _end_date: string; _reason?: string | null; _reliever_id?: string }
+        Returns: string
+      }
+      decide_leave_request: {
+        Args: { _id: string; _approve: boolean; _notes?: string | null }
+        Returns: undefined
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
