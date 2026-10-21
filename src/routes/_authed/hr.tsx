@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { useAuth, ROLE_LABELS, type AppRole } from "@/lib/auth";
 import { isHrManager } from "@/lib/permissions";
 import { formatDate } from "@/lib/format";
-import { Plus, X, Download, FileText, CheckCircle2, XCircle, Users } from "lucide-react";
+import { Plus, X, Download, FileText, CheckCircle2, XCircle, Users, Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authed/hr")({
   head: () => ({
@@ -156,6 +156,18 @@ function HrPage() {
     else { toast.success(approve ? "Request approved" : "Request rejected"); load(); }
   }
 
+  async function deleteLeaveRecord(id: string) {
+    if (!confirm("Permanently delete this finalized leave record? This cannot be undone.")) return;
+    setBusy(true);
+    const { error } = await supabase.rpc("delete_leave_record", { _id: id });
+    setBusy(false);
+    if (error) toast.error(error.message);
+    else {
+      toast.success("Leave record deleted");
+      await load();
+    }
+  }
+
   async function downloadPayslip(path: string) {
     const { data, error } = await supabase.storage.from("payslips").createSignedUrl(path, 60);
     if (error) toast.error(error.message);
@@ -300,7 +312,7 @@ function HrPage() {
                           className="h-8 px-2 rounded-md border bg-background text-xs"
                         />
                         <div className="flex gap-2">
-                          <button disabled={busy} onClick={() => decide(r.id, true)} className="h-7 px-2 rounded-md bg-emerald-600 text-white text-xs inline-flex items-center gap-1"><CheckCircle2 className="h-3 w-3" />{r.status === "reliever_approved" ? "Final approve" : "Approve & hand over"}</button>
+                          <button disabled={busy} onClick={() => decide(r.id, true)} className="h-7 px-2 rounded-md bg-emerald-600 text-white text-xs inline-flex items-center gap-1"><CheckCircle2 className="h-3 w-3" />{r.status === "reliever_approved" ? "Director approve & hand over" : "Reliever approve"}</button>
                           <button disabled={busy} onClick={() => decide(r.id, false)} className="h-7 px-2 rounded-md bg-destructive text-destructive-foreground text-xs inline-flex items-center gap-1"><XCircle className="h-3 w-3" />Reject</button>
                         </div>
                       </div>
@@ -328,10 +340,10 @@ function HrPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-muted/40 text-left text-xs text-muted-foreground border-b">
-                  <tr><th className="py-2 px-3">Employee</th><th>Reliever</th><th>Leave type</th><th>Dates</th><th>Days</th><th>Client tasks transferred</th><th>Tax returns transferred</th><th>Service milestones transferred</th><th>Final status</th><th>Decision date</th><th>Decision notes</th></tr>
+                  <tr><th className="py-2 px-3">Employee</th><th>Reliever</th><th>Leave type</th><th>Dates</th><th>Days</th><th>Client tasks transferred</th><th>Tax returns transferred</th><th>Service milestones transferred</th><th>Final status</th><th>Decision date</th><th>Decision notes</th><th className="w-12">Delete</th></tr>
                 </thead>
                 <tbody>
-                  {leaveRecords.length === 0 && <tr><td colSpan={11} className="py-10 text-center text-muted-foreground">No approved or declined leave requests yet.</td></tr>}
+                  {leaveRecords.length === 0 && <tr><td colSpan={12} className="py-10 text-center text-muted-foreground">No approved or declined leave requests yet.</td></tr>}
                   {leaveRecords.map(r => (
                     <tr key={r.id} className="border-b last:border-0 align-top">
                       <td className="py-2 px-3">{profiles.find(p => p.id === r.employee_id)?.full_name || r.profiles?.full_name || "—"}</td>
@@ -345,6 +357,11 @@ function HrPage() {
                       <td><StatusBadge status={r.status} /></td>
                       <td className="whitespace-nowrap text-xs">{r.decided_at ? new Date(r.decided_at).toLocaleString("en-KE") : "—"}</td>
                       <td className="text-xs max-w-[14rem]">{r.decision_notes || r.reliever_decision_notes || "—"}</td>
+                      <td className="py-2 px-2 text-center">
+                        <button type="button" disabled={busy} onClick={() => deleteLeaveRecord(r.id)} title="Delete leave record" aria-label={`Delete leave record for ${profiles.find(p => p.id === r.employee_id)?.full_name || "employee"}`} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-destructive hover:bg-destructive/10 disabled:opacity-50">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -448,5 +465,5 @@ function StatusBadge({ status }: { status: string }) {
     cancelled: "bg-muted text-muted-foreground",
     reliever_approved: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200",
   };
-  return <span className={`text-xs px-2 py-0.5 rounded-full ${map[status] || "bg-muted"}`}>{status}</span>;
+  return <span className={`text-xs px-2 py-0.5 rounded-full ${map[status] || "bg-muted"}`}>{({ pending: "Pending reliever", reliever_approved: "Awaiting director", approved: "Approved", rejected: "Rejected", cancelled: "Cancelled" } as Record<string, string>)[status] || status}</span>;
 }
