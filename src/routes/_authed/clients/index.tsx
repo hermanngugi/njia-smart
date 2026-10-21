@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Plus, Search, X, Pause, Play, Trash2 } from "lucide-react";
@@ -12,6 +12,47 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 export const Route = createFileRoute("/_authed/clients/")({ component: ClientsList });
 
 const STATUSES = ["not_started","in_progress","waiting_for_documents","under_review","filed","completed","overdue","urgent"];
+
+/** Reveals client rows smoothly the first time they enter the scroll viewport. */
+function ScrollAnimatedRow({ children, className, style, ...props }: React.HTMLAttributes<HTMLTableRowElement>) {
+  const rowRef = useRef<HTMLTableRowElement>(null);
+  const [revealed, setRevealed] = useState(false);
+
+  useEffect(() => {
+    const row = rowRef.current;
+    if (!row) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || !("IntersectionObserver" in window)) {
+      setRevealed(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setRevealed(true);
+        observer.unobserve(entry.target);
+      }
+    }, { root: row.closest(".client-list-scroll"), threshold: 0.04 });
+
+    observer.observe(row);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <tr
+      ref={rowRef}
+      {...props}
+      className={className}
+      style={{
+        ...style,
+        opacity: revealed ? 1 : 0,
+        transform: revealed ? "translateY(0)" : "translateY(9px)",
+        transition: "opacity 380ms ease-out, transform 420ms cubic-bezier(0.2, 0.75, 0.25, 1)",
+      }}
+    >
+      {children}
+    </tr>
+  );
+}
 
 function ClientsList() {
   const navigate = useNavigate();
@@ -188,7 +229,7 @@ function ClientsList() {
       )}
 
       <div className="bg-card border rounded-lg overflow-hidden flex-1 min-h-0 flex flex-col">
-        <div className="overflow-auto flex-1 min-h-0">
+        <div className="client-list-scroll overflow-auto flex-1 min-h-0">
           <table className="w-full text-sm">
             <thead className="text-left text-xs text-muted-foreground border-b bg-muted sticky top-0 z-10">
               <tr>
@@ -202,7 +243,7 @@ function ClientsList() {
                 const names = assignByClient[r.id] ?? [];
                 const ctype = (r.client_type ?? "company") as "company"|"individual";
                 return (
-                  <tr
+                  <ScrollAnimatedRow
                     key={r.id}
                     tabIndex={0}
                     role="link"
@@ -271,7 +312,7 @@ function ClientsList() {
                         </AlertDialog>
                       )}
                     </td>
-                  </tr>
+                  </ScrollAnimatedRow>
                 );
               })}
             </tbody>
