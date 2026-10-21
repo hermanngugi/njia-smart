@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useLiveRefresh } from "@/hooks/use-live-refresh";
 import { toast } from "sonner";
-import { AlertTriangle, Clock, UserX, LayoutGrid, Check, ChevronDown, ChevronUp, Download, Upload, FileText } from "lucide-react";
+import { AlertTriangle, Clock, UserX, LayoutGrid, Check, ChevronDown, ChevronUp, Download, Upload, FileText, Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { CompletionInvoiceDialog } from "@/components/completion-invoice-dialog";
 import { daysUntil, periodsOverdue, formatDate, formatDateTime } from "@/lib/format";
@@ -59,6 +59,8 @@ function TaxPage() {
   const [reportType, setReportType] = useState<string>("");
   const [reportFilter, setReportFilter] = useState<"all" | "filed" | "not_filed">("all");
   const [reportAssignee, setReportAssignee] = useState("");
+  const [clearRecordsClientId, setClearRecordsClientId] = useState("");
+  const [clearingRecords, setClearingRecords] = useState(false);
   const [expandedType, setExpandedType] = useState<string | null>(null);
   const attemptedSchedule = useRef<Set<string>>(new Set());
   const [scheduleFailed, setScheduleFailed] = useState<Set<string>>(new Set());
@@ -325,6 +327,72 @@ function TaxPage() {
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     const statusLabel = statusFilter === "not_filed" ? "Not filed" : statusFilter === "filed" ? "Filed" : "all";
     toast.success(`Downloaded ${rowsToExport.length} ${statusLabel.toLowerCase()} record${rowsToExport.length === 1 ? "" : "s"} as an 8-column CSV.`);
+  }
+
+  async function clearClientFilingRecords() {
+    if (!isAdmin) {
+      toast.error("Only Admin or Director can clear a client's filing records.");
+      return;
+    }
+    const client = clients.find((item: any) => item.id === clearRecordsClientId);
+    if (!client) {
+      toast.error("Select a client first.");
+      return;
+    }
+    const clientReturns = returns.filter((item: any) => item.client_id === client.id);
+    if (clientReturns.length === 0) {
+      toast.info("This client has no filing records to clear.");
+      return;
+    }
+    const returnIds = clientReturns.map((item: any) => item.id);
+    const docs = returnIds.flatMap((id: string) => documentsByReturn.get(id) ?? []);
+    const message = `Permanently clear ${clientReturns.length} filing record(s) and ${docs.length} linked document(s) for ${client.company_name}? Actual files will be removed from Storage. The client profile, tax obligations, and invoices will be kept. Active obligations may generate fresh current filing records.`;
+    if (!window.confirm(message)) return;
+
+    setClearingRecords(true);
+    try {
+      const paths = [...new Set(docs.map((doc: any) => doc.file_path).filter((path: any): path is string => typeof path === "string" && path.length > 0))];
+      if (paths.length) {
+        const { error: storageError } = await supabase.storage.from("client-documents").remove(paths);
+        if (storageError) {
+          toast.error(`Storage deletion failed. Filing records were not cleared: ${storageError.message}`);
+          return;
+        }
+      }
+
+      if (docs.length) {
+        const docIds = docs.map((doc: any) => doc.id);
+        const { error: docsError } = await supabase.from("documents").delete().in("id", docIds);
+        if (docsError) {
+          toast.error(`Files were removed, but document metadata could not be cleared: ${docsError.message}`);
+          await load(true);
+          return;
+        }
+      }
+
+      const { error: assigneeError } = await supabase.from("tax_return_assignees" as any).delete().in("tax_return_id", returnIds);
+      if (assigneeError) {
+        toast.error(`Documents were removed, but filing assignments could not be cleared: ${assigneeError.message}`);
+        await load(true);
+        return;
+      }
+
+      const { error: returnsError } = await supabase.from("tax_returns").delete().eq("client_id", client.id);
+      if (returnsError) {
+        toast.error(`Documents were removed, but filing records could not be cleared: ${returnsError.message}`);
+        await load(true);
+        return;
+      }
+
+      toast.success(`Cleared filing records for ${client.company_name}.`);
+      setClearRecordsClientId("");
+      await load(true);
+    } catch (error: any) {
+      toast.error(error?.message || "Unable to clear filing records.");
+      await load(true);
+    } finally {
+      setClearingRecords(false);
+    }
   }
 
   async function uploadReceipt(returnId: string, clientId: string, file: File): Promise<boolean> {
@@ -633,6 +701,30 @@ function TaxPage() {
                 {staff.map(person => <option key={person.id} value={person.id}>{person.full_name || "Unnamed staff"}</option>)}
               </select>
             </div>
+            {isAdmin && (
+              <div className="flex flex-wrap items-center gap-2 rounded-md border border-destructive/30 p-2">
+                <select
+                  value={clearRecordsClientId}
+                  onChange={e => setClearRecordsClientId(e.target.value)}
+                  disabled={clearingRecords}
+                  aria-label="Select client whose filing records to clear"
+                  className="h-9 min-w-[190px] rounded-md border bg-background px-3 text-sm"
+                >
+                  <option value="">Clear records for client…</option>
+                  {[...clients].sort((a: any, b: any) => (a.company_name || "").localeCompare(b.company_name || "", undefined, { sensitivity: "base", numeric: true })).map((client: any) => (
+                    <option key={client.id} value={client.id}>{client.company_name}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={clearClientFilingRecords}
+                  disabled={!clearRecordsClientId || clearingRecords}
+                  className="inline-flex h-9 items-center gap-2 rounded-md border border-destructive/40 px-3 text-sm font-medium text-destructive hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Trash2 className="h-4 w-4" /> {clearingRecords ? "Clearing…" : "Clear filing records"}
+                </button>
+              </div>
+            )}
             <div className="flex flex-wrap gap-2 ml-auto">
               <ChecklistChip active={reportFilter === "all"} onClick={() => setReportFilter("all")} icon={LayoutGrid} label="All" value={assigneeScopedReportRows.length} tone="muted" />
               <ChecklistChip active={reportFilter === "filed"} onClick={() => setReportFilter("filed")} icon={Check} label="Filed" value={assigneeScopedReportRows.filter(r => r.filed).length} tone="muted" />
@@ -654,21 +746,11 @@ function TaxPage() {
           <div className="bg-card border rounded-lg overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-muted/40 text-left text-xs text-muted-foreground border-b">
-                <tr><th className="py-2 px-3">Client</th><th className="py-2 px-3">Tax type / filing date</th><th className="py-2 px-3">Status</th><th className="py-2 px-3">Period ending</th><th className="py-2 px-3">Due date</th><th className="py-2 px-3">Assigned to</th><th className="py-2 px-3">Filed on</th><th className="py-2 px-3">Receipt / proof</th></tr>
+                <tr><th className="py-2 px-3">Client</th><th className="py-2 px-3">Tax type</th><th className="py-2 px-3">Status</th><th className="py-2 px-3">Period ending</th><th className="py-2 px-3">Due date</th><th className="py-2 px-3">Assigned to</th><th className="py-2 px-3">Filed on</th><th className="py-2 px-3">Receipt / proof</th></tr>
               </thead>
               <tbody>
                 {filteredReportRows.length === 0 && <tr><td colSpan={8} className="py-8 text-center text-muted-foreground">No obligations match this view.</td></tr>}
                 {filteredReportRows.map(row => (
-                  row.filed ? (
-                    <tr key={row.key} className="border-b last:border-0 hover:bg-muted/20">
-                      <td className="py-2 px-3 font-medium">{row.client.company_name}</td>
-                      <td colSpan={7} className="py-2 px-3 text-xs text-muted-foreground">
-                        <span className="font-medium text-foreground">{row.pol.label}</span>
-                        <span className="mx-2">·</span>
-                        {row.cur?.period_end ? formatDate(row.cur.period_end) : row.cur?.filed_at ? formatDate(row.cur.filed_at) : "Date not recorded"}
-                      </td>
-                    </tr>
-                  ) : (
                   <tr key={row.key} className="border-b last:border-0 hover:bg-muted/20">
                     <td className="py-1.5 px-3 font-medium">{row.client.company_name}</td>
                     <td className="py-1.5 px-3 text-xs text-muted-foreground">{row.pol.label}</td>
@@ -712,7 +794,7 @@ function TaxPage() {
                       ) : <span className="text-xs text-muted-foreground">No filing period</span>}
                     </td>
                   </tr>
-                )))}
+                ))}
               </tbody>
             </table>
           </div>
