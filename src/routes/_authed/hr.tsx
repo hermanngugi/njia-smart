@@ -36,6 +36,7 @@ function money(n: number, currency = "KES") {
 
 function HrPage() {
   const { user, isAdmin, roles: myRoles } = useAuth();
+  const isDirector = myRoles.includes("director");
   const isHrMgr = isHrManager(myRoles);
   // Directory (the full staff/employee list) is restricted to Admin,
   // Accountant and Director — everyone else lands on their own leave tab.
@@ -53,7 +54,7 @@ function HrPage() {
   const [myPayslips, setMyPayslips] = useState<any[]>([]);
 
   const [loading, setLoading] = useState(true);
-  const [reqForm, setReqForm] = useState<any>({ leave_type_id: "", start_date: "", end_date: "", reason: "" });
+  const [reqForm, setReqForm] = useState<any>({ leave_type_id: "", start_date: "", end_date: "", reason: "", reliever_id: "" });
   const [reqOpen, setReqOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [decideNotes, setDecideNotes] = useState<Record<string, string>>({});
@@ -77,16 +78,21 @@ function HrPage() {
     setLeaveTypes(lt.data ?? []);
     setMyBalances((bal.data ?? []).filter((b: any) => b.employee_id === user?.id));
     setMyRequests((lr.data ?? []).filter((r: any) => r.employee_id === user?.id));
-    setPendingApprovals((lr.data ?? []).filter((r: any) => r.status === "pending" && r.employee_id !== user?.id));
+    setPendingApprovals((lr.data ?? []).filter((r: any) => {
+      if (r.employee_id === user?.id) return false;
+      if (r.status === "pending") return r.reliever_id === user?.id || isAdmin;
+      if (r.status === "reliever_approved") return isDirector || isAdmin;
+      return false;
+    }));
     setMyPayslips((ps.data ?? []).filter((s: any) => s.employee_id === user?.id));
     setLoading(false);
   }
-  useEffect(() => { if (user) load(); }, [user?.id]);
+  useEffect(() => { if (user) load(); }, [user?.id, isAdmin, isDirector]);
 
   const canApproveAny = useMemo(() => {
-    if (isAdmin) return true;
+    if (isAdmin || isDirector || pendingApprovals.length > 0) return true;
     return Object.values(employment).some((e: any) => e.manager_id === user?.id);
-  }, [employment, isAdmin, user?.id]);
+  }, [employment, isAdmin, isDirector, pendingApprovals.length, user?.id]);
 
   // Gender-restricted leave types (maternity/paternity) are only offered to
   // employees whose recorded gender matches. No gender on file = not offered.
@@ -110,8 +116,8 @@ function HrPage() {
 
   async function submitLeaveRequest(e: React.FormEvent) {
     e.preventDefault();
-    if (!reqForm.leave_type_id || !reqForm.start_date || !reqForm.end_date) {
-      toast.error("Pick a leave type and both dates");
+    if (!reqForm.leave_type_id || !reqForm.start_date || !reqForm.end_date || !reqForm.reliever_id) {
+      toast.error("Pick a leave type, both dates, and a reliever");
       return;
     }
     setBusy(true);
@@ -120,13 +126,14 @@ function HrPage() {
       _start_date: reqForm.start_date,
       _end_date: reqForm.end_date,
       _reason: reqForm.reason || null,
+      _reliever_id: reqForm.reliever_id,
     });
     setBusy(false);
     if (error) toast.error(error.message);
     else {
       toast.success("Leave request submitted");
       setReqOpen(false);
-      setReqForm({ leave_type_id: "", start_date: "", end_date: "", reason: "" });
+      setReqForm({ leave_type_id: "", start_date: "", end_date: "", reason: "", reliever_id: "" });
       load();
     }
   }
@@ -279,7 +286,7 @@ function HrPage() {
                     <td>{leaveTypes.find(t => t.id === r.leave_type_id)?.name || "—"}</td>
                     <td className="text-xs">{formatDate(r.start_date)} – {formatDate(r.end_date)}</td>
                     <td>{r.days}</td>
-                    <td className="text-xs text-muted-foreground max-w-[12rem] truncate">{r.reason || "—"}</td>
+                    <td className="text-xs text-muted-foreground max-w-[12rem] truncate">{r.reason || "—"}<div className="mt-1 font-medium text-primary">{r.status === "reliever_approved" ? "Director approval" : "Reliever review"}</div></td>
                     <td className="py-2 pr-3">
                       <div className="flex flex-col gap-1">
                         <input
@@ -289,7 +296,7 @@ function HrPage() {
                           className="h-8 px-2 rounded-md border bg-background text-xs"
                         />
                         <div className="flex gap-2">
-                          <button disabled={busy} onClick={() => decide(r.id, true)} className="h-7 px-2 rounded-md bg-emerald-600 text-white text-xs inline-flex items-center gap-1"><CheckCircle2 className="h-3 w-3" />Approve</button>
+                          <button disabled={busy} onClick={() => decide(r.id, true)} className="h-7 px-2 rounded-md bg-emerald-600 text-white text-xs inline-flex items-center gap-1"><CheckCircle2 className="h-3 w-3" />{r.status === "reliever_approved" ? "Final approve" : "Approve & hand over"}</button>
                           <button disabled={busy} onClick={() => decide(r.id, false)} className="h-7 px-2 rounded-md bg-destructive text-destructive-foreground text-xs inline-flex items-center gap-1"><XCircle className="h-3 w-3" />Reject</button>
                         </div>
                       </div>
@@ -345,6 +352,11 @@ function HrPage() {
             {hiddenRestrictedTypes > 0 && (
               <p className="text-xs text-muted-foreground">Maternity/Paternity leave is offered once HR has recorded your gender details.</p>
             )}
+            <select required value={reqForm.reliever_id || ""} onChange={e => setReqForm({ ...reqForm, reliever_id: e.target.value })} className="w-full h-9 px-3 rounded-md border bg-background text-sm">
+              <option value="">Select reliever…</option>
+              {profiles.filter(p => p.id !== user?.id).map(p => <option key={p.id} value={p.id}>{p.full_name || p.email || p.id}</option>)}
+            </select>
+            <p className="text-xs text-muted-foreground">Your reliever reviews first. If approved, outstanding client tasks and deadlines assigned to you are handed over before the director's final decision.</p>
             <div className="grid grid-cols-2 gap-2">
               <input required type="date" value={reqForm.start_date} onChange={e => setReqForm({ ...reqForm, start_date: e.target.value })} className="h-9 px-3 rounded-md border bg-background text-sm" />
               <input required type="date" value={reqForm.end_date} onChange={e => setReqForm({ ...reqForm, end_date: e.target.value })} className="h-9 px-3 rounded-md border bg-background text-sm" />
@@ -364,6 +376,7 @@ function StatusBadge({ status }: { status: string }) {
     approved: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200",
     rejected: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200",
     cancelled: "bg-muted text-muted-foreground",
+    reliever_approved: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200",
   };
   return <span className={`text-xs px-2 py-0.5 rounded-full ${map[status] || "bg-muted"}`}>{status}</span>;
 }
