@@ -113,6 +113,49 @@ function ClientDetail() {
     navigate({ to: "/clients" });
   }
 
+  async function deleteFilingRecord(returnId: string) {
+    if (!isAdmin) {
+      toast.error("Only Admin or Director can delete filing history.");
+      return;
+    }
+    const filing = related.tax.find((row: any) => row.id === returnId);
+    if (!filing) { toast.error("Filing record not found."); return; }
+    const label = `${filing.return_type?.replace(/_/g, " ") ?? "filing"} (${formatDate(filing.due_date)})`;
+    if (!window.confirm(`Permanently delete this ${label} for this client? Linked uploaded files, document records, and filing assignments will also be deleted. Client details, tax obligations, and invoices will be kept. This cannot be undone.`)) return;
+
+    try {
+      const { data: docs, error: docsLoadError } = await supabase
+        .from("documents")
+        .select("id, file_path")
+        .eq("tax_return_id", returnId);
+      if (docsLoadError) throw new Error(`Could not load linked documents: ${docsLoadError.message}`);
+
+      const paths = [...new Set((docs ?? []).map((doc: any) => doc.file_path).filter((path: any): path is string => typeof path === "string" && path.length > 0))];
+      if (paths.length) {
+        const { error } = await supabase.storage.from("client-documents").remove(paths);
+        if (error) throw new Error(`Could not delete uploaded files; filing record was kept: ${error.message}`);
+      }
+
+      const docIds = (docs ?? []).map((doc: any) => doc.id);
+      if (docIds.length) {
+        const { error } = await supabase.from("documents").delete().in("id", docIds);
+        if (error) throw new Error(`Uploaded files were removed, but document records could not be deleted: ${error.message}`);
+      }
+
+      const { error: assigneeError } = await supabase.from("tax_return_assignees" as any).delete().eq("tax_return_id", returnId);
+      if (assigneeError) throw new Error(`Linked documents were removed, but filing assignments could not be deleted: ${assigneeError.message}`);
+
+      const { error: returnError } = await supabase.from("tax_returns").delete().eq("id", returnId).eq("client_id", id);
+      if (returnError) throw new Error(`Linked files and assignments were removed, but the filing record could not be deleted: ${returnError.message}`);
+
+      toast.success("Filing history and linked records deleted.");
+      await load();
+    } catch (error: any) {
+      toast.error(error?.message || "Unable to delete filing history.");
+      await load();
+    }
+  }
+
   function openAdd(kind: NonNullable<typeof addOpen>) {
     const defaults: any = {
       tax: { return_types: [] as string[] },
@@ -366,6 +409,13 @@ function ClientDetail() {
               })}
             </div>
           )}
+          <div className="space-y-2">
+            <div>
+              <h3 className="font-semibold">Filing history</h3>
+              <p className="text-sm text-muted-foreground">Past and current filing records for this client.</p>
+            </div>
+            <TaxList rows={related.tax} onDelete={deleteFilingRecord} empty="No filing history for this client." canDelete={isAdmin} />
+          </div>
         </div>
       )}
       {tab === "Audit" && <TabSection label="audit engagement" onAdd={() => openAdd("audit")}><RelatedList rows={related.engagements.filter((e:any)=>e.type==="audit")} cols={["title","status","due_date"]} empty="No audit engagements" /></TabSection>}
@@ -530,7 +580,7 @@ function RelatedList({ rows, cols, empty }: any) {
   );
 }
 
-function TaxList({ rows, onDelete, empty }: any) {
+function TaxList({ rows, onDelete, empty, canDelete }: any) {
   if (!rows.length) return <div className="bg-card border rounded-lg p-8 text-center text-muted-foreground text-sm">{empty}</div>;
   return (
     <div className="bg-card border rounded-lg overflow-hidden">
@@ -541,7 +591,7 @@ function TaxList({ rows, onDelete, empty }: any) {
             <th className="py-2 px-3">Period end</th>
             <th className="py-2 px-3">Due date</th>
             <th className="py-2 px-3">Status</th>
-            <th className="py-2 px-3 w-10"></th>
+            {canDelete && <th className="py-2 px-3 w-10">Action</th>}
           </tr>
         </thead>
         <tbody>
@@ -551,27 +601,11 @@ function TaxList({ rows, onDelete, empty }: any) {
               <td className="py-2 px-3">{formatDate(r.period_end)}</td>
               <td className="py-2 px-3">{formatDate(r.due_date)}</td>
               <td className="py-2 px-3 capitalize">{r.status?.replace(/_/g, " ")}</td>
-              <td className="py-2 px-3">
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <button type="button" className="text-muted-foreground hover:text-destructive p-1" aria-label="Remove tax obligation">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Remove tax obligation?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This will remove the <strong className="capitalize">{r.return_type?.replace(/_/g, " ")}</strong> obligation from this client only. This action cannot be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => onDelete(r.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Remove</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </td>
+              {canDelete && <td className="py-2 px-3">
+                <button type="button" onClick={() => onDelete(r.id)} className="text-muted-foreground hover:text-destructive p-1" aria-label="Delete filing history" title="Delete filing history">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </td>}
             </tr>
           ))}
         </tbody>
