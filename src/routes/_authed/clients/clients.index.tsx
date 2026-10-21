@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -14,6 +14,7 @@ export const Route = createFileRoute("/_authed/clients/")({ component: ClientsLi
 const STATUSES = ["not_started","in_progress","waiting_for_documents","under_review","filed","completed","overdue","urgent"];
 
 function ClientsList() {
+  const navigate = useNavigate();
   const { isAdmin, canCreate, canDelete } = useAuth();
   const [rows, setRows] = useState<any[]>([]);
   const [assignByClient, setAssignByClient] = useState<Record<string, string[]>>({});
@@ -28,7 +29,7 @@ function ClientsList() {
 
   async function load() {
     const [cRes, aRes, pRes] = await Promise.all([
-      supabase.from("clients").select("*").order("company_name", { ascending: true }),
+      supabase.from("clients").select("*").order("updated_at", { ascending: false }).order("created_at", { ascending: false }).order("company_name", { ascending: true }),
       supabase.from("client_assignments").select("client_id, user_id"),
       supabase.from("profiles").select("id, full_name"),
     ]);
@@ -65,21 +66,11 @@ function ClientsList() {
     else { toast.success("Client added"); setOpen(false); setForm({ client_type:"company", company_name:"", first_name:"", last_name:"", id_number:"", kra_pin:"", reg_number:"", industry:"", email:"", phone:"", engagement_type:"", notes:"" }); load(); }
   }
 
-  const filtered = useMemo(() => rows
-    .filter(r =>
-      (typeFilter === "all" || (r.client_type ?? "company") === typeFilter) &&
-      (stateFilter === "all" || (stateFilter === "paused" ? r.is_paused : !r.is_paused)) &&
-      clientMatches(r, q.trim())
-    )
-    .sort((a, b) => {
-      const nameForSort = (client: any) => {
-        if ((client.client_type ?? "company") === "individual") {
-          return [client.first_name, client.last_name].filter(Boolean).join(" ").trim() || client.company_name || "";
-        }
-        return client.company_name || "";
-      };
-      return nameForSort(a).localeCompare(nameForSort(b), undefined, { sensitivity: "base", numeric: true });
-    }), [rows, typeFilter, stateFilter, q]);
+  const filtered = useMemo(() => rows.filter(r =>
+    (typeFilter === "all" || (r.client_type ?? "company") === typeFilter) &&
+    (stateFilter === "all" || (stateFilter === "paused" ? r.is_paused : !r.is_paused)) &&
+    clientMatches(r, q.trim())
+  ), [rows, typeFilter, stateFilter, q]);
 
   const pausedCount = rows.filter(r => r.is_paused).length;
 
@@ -167,10 +158,8 @@ function ClientsList() {
       {selected.size > 0 && (
         <div className="shrink-0 bg-card border rounded-lg p-3 flex flex-wrap items-center gap-3">
           <span className="text-sm font-medium">{selected.size} selected</span>
-          {isAdmin && <>
-            <button disabled={bulkBusy} onClick={()=>bulkPause(true)} className="h-8 px-3 rounded-md border text-xs inline-flex items-center gap-1.5 hover:bg-muted disabled:opacity-50"><Pause className="h-3.5 w-3.5" />Deactivate</button>
-            <button disabled={bulkBusy} onClick={()=>bulkPause(false)} className="h-8 px-3 rounded-md border text-xs inline-flex items-center gap-1.5 hover:bg-muted disabled:opacity-50"><Play className="h-3.5 w-3.5" />Activate</button>
-          </>}
+          <button disabled={bulkBusy} onClick={()=>bulkPause(true)} className="h-8 px-3 rounded-md border text-xs inline-flex items-center gap-1.5 hover:bg-muted disabled:opacity-50"><Pause className="h-3.5 w-3.5" />Pause</button>
+          <button disabled={bulkBusy} onClick={()=>bulkPause(false)} className="h-8 px-3 rounded-md border text-xs inline-flex items-center gap-1.5 hover:bg-muted disabled:opacity-50"><Play className="h-3.5 w-3.5" />Resume</button>
           {isAdmin && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -207,10 +196,28 @@ function ClientsList() {
                 const names = assignByClient[r.id] ?? [];
                 const ctype = (r.client_type ?? "company") as "company"|"individual";
                 return (
-                  <tr key={r.id} className={`border-b last:border-0 hover:bg-muted/30 ${r.is_paused ? "opacity-60" : ""}`}>
+                  <tr
+                    key={r.id}
+                    tabIndex={0}
+                    role="link"
+                    aria-label={`Open client ${r.company_name}`}
+                    onClick={(event) => {
+                      const target = event.target as HTMLElement;
+                      if (target.closest("a, button, input, [role='button'], [data-radix-collection-item]")) return;
+                      navigate({ to: "/clients/$id", params: { id: r.id } });
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget) return;
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        navigate({ to: "/clients/$id", params: { id: r.id } });
+                      }
+                    }}
+                    className={`group border-b last:border-0 cursor-pointer outline-none transition-colors duration-150 hover:bg-primary/[0.045] focus-visible:bg-primary/[0.07] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/60 ${r.is_paused ? "opacity-60" : ""}`}
+                  >
                     <td className="py-2 px-3"><input type="checkbox" checked={selected.has(r.id)} onChange={()=>toggleSelected(r.id)} /></td>
                     <td className="py-2 px-3 font-medium">
-                      <Link to="/clients/$id" params={{ id: r.id }} className="hover:text-primary">{r.company_name}</Link>
+                      <Link to="/clients/$id" params={{ id: r.id }} className="hover:text-primary group-hover:text-primary transition-colors">{r.company_name}</Link>
                       {r.is_paused && <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground align-middle">Paused</span>}
                     </td>
                     <td>
@@ -232,9 +239,9 @@ function ClientsList() {
                     <td><span className={`text-xs px-2 py-1 rounded-full capitalize ${STATUS_COLORS[r.status]}`}>{statusLabel(r.status)}</span></td>
                     <td className="text-muted-foreground">{formatDate(r.created_at)}</td>
                     <td className="py-2 px-3 text-right whitespace-nowrap">
-                      {isAdmin && <button onClick={()=>setPaused([r.id], !r.is_paused)} title={r.is_paused ? "Activate client" : "Deactivate client"} aria-label={r.is_paused ? "Activate client" : "Deactivate client"} className="text-muted-foreground hover:text-foreground p-1">
+                      <button onClick={()=>setPaused([r.id], !r.is_paused)} title={r.is_paused ? "Resume" : "Pause"} className="text-muted-foreground hover:text-foreground p-1">
                         {r.is_paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
-                      </button>}
+                      </button>
                       {canDelete("clients", { createdBy: r.created_by }) && (
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
