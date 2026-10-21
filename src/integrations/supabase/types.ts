@@ -1935,6 +1935,10 @@ export type Database = {
         Args: { _id: string; _approve: boolean; _notes?: string | null }
         Returns: undefined
       }
+      delete_leave_record: {
+        Args: { _id: string }
+        Returns: undefined
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
