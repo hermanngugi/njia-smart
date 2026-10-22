@@ -139,7 +139,11 @@ const KNOWLEDGE_ARTICLES = [
   },
 ];
 
-const KNOWLEDGE_CATEGORIES = ["All topics", "Network", "Hardware", "Software", "Access/Account", "Security"];
+const KNOWLEDGE_CATEGORIES = ["All topics", "Network", "Hardware", "Software", "Access/Account", "Security", "Other"];
+const KNOWLEDGE_EDIT_CATEGORIES = KNOWLEDGE_CATEGORIES.filter((category) => category !== "All topics");
+const EMPTY_KNOWLEDGE_FORM = { id: "", title: "", category: "Hardware", summary: "", tags: "", stepsText: "" };
+type KnowledgeArticle = { id: string; slug?: string; title: string; category: string; summary: string; tags: string; steps: string[]; created_at?: string; updated_at?: string };
+
 
 const PRIORITY_COLORS: Record<string, string> = {
   Low: "bg-muted text-muted-foreground",
@@ -531,9 +535,14 @@ function IctServiceDesk() {
   const [maintenanceCount, setMaintenanceCount] = useState(0);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [typeFilter, setTypeFilter] = useState("");
+  const [knowledgeArticles, setKnowledgeArticles] = useState<KnowledgeArticle[]>(KNOWLEDGE_ARTICLES as KnowledgeArticle[]);
   const [knowledgeSearch, setKnowledgeSearch] = useState("");
   const [knowledgeCategory, setKnowledgeCategory] = useState("All topics");
   const [expandedArticle, setExpandedArticle] = useState<string | null>(null);
+  const [knowledgeFormOpen, setKnowledgeFormOpen] = useState(false);
+  const [knowledgeForm, setKnowledgeForm] = useState(EMPTY_KNOWLEDGE_FORM);
+  const [knowledgeSaving, setKnowledgeSaving] = useState(false);
+  const canManageKnowledge = fullAccess || isIctTeam;
 
   const [assets, setAssets] = useState<Asset[]>([]);
   const [assetTotalQty, setAssetTotalQty] = useState(0);
@@ -585,6 +594,19 @@ function IctServiceDesk() {
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
+
+  // Knowledge articles are shared across staff and managed through Supabase.
+  // If the migration has not been applied, the built-in guides remain available.
+  async function loadKnowledgeArticles() {
+    const { data, error } = await (supabase.from("ict_knowledge_articles" as any) as any)
+      .select("id, slug, title, category, summary, tags, steps, created_at, updated_at")
+      .eq("active", true)
+      .order("category")
+      .order("title");
+    if (error) return;
+    setKnowledgeArticles((data ?? []) as KnowledgeArticle[]);
+  }
+  useEffect(() => { loadKnowledgeArticles(); }, []);
 
   // Live refresh: a newly raised or updated ticket shows up without a reload.
   useEffect(() => {
@@ -692,7 +714,7 @@ function IctServiceDesk() {
     load();
   }
 
-  const filteredKnowledgeArticles = KNOWLEDGE_ARTICLES.filter((article) => {
+  const filteredKnowledgeArticles = knowledgeArticles.filter((article) => {
     const matchesCategory = knowledgeCategory === "All topics" || article.category === knowledgeCategory;
     const query = knowledgeSearch.trim().toLowerCase();
     const searchable = `${article.title} ${article.category} ${article.summary} ${article.tags} ${article.steps.join(" ")}`.toLowerCase();
@@ -732,7 +754,10 @@ function IctServiceDesk() {
               <p className="text-sm text-muted-foreground mt-1">Quick self-help guides for common office IT issues. Try a guide before raising a request.</p>
             </div>
           </div>
-          <span className="text-xs rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{KNOWLEDGE_ARTICLES.length} guides</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{knowledgeArticles.length} guides</span>
+            {canManageKnowledge && <button type="button" onClick={() => { setKnowledgeForm(EMPTY_KNOWLEDGE_FORM); setKnowledgeFormOpen(true); }} className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm inline-flex items-center gap-2"><Plus className="h-4 w-4" /> Add guide</button>}
+          </div>
         </div>
         <div className="p-4 space-y-4">
           <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_190px]">
@@ -772,11 +797,17 @@ function IctServiceDesk() {
                       <ol className="list-decimal pl-5 space-y-2 text-sm text-muted-foreground">
                         {article.steps.map((step, index) => <li key={`${article.id}-${index}`} className="pl-1">{step}</li>)}
                       </ol>
-                      {canRaiseTicket && (
-                        <button type="button" onClick={() => { setForm({ ...EMPTY_FORM, category: article.category === "Network" || article.category === "Hardware" || article.category === "Software" || article.category === "Access/Account" ? article.category : "Other", title: `Help needed: ${article.title}` }); setFormOpen(true); }} className="mt-4 h-9 px-3 rounded-md border text-sm inline-flex items-center gap-2 hover:bg-muted">
-                          <Ticket className="h-4 w-4" /> Still need help? Raise a ticket
-                        </button>
-                      )}
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {canRaiseTicket && (
+                          <button type="button" onClick={() => { setForm({ ...EMPTY_FORM, category: article.category === "Network" || article.category === "Hardware" || article.category === "Software" || article.category === "Access/Account" ? article.category : "Other", title: `Help needed: ${article.title}` }); setFormOpen(true); }} className="h-9 px-3 rounded-md border text-sm inline-flex items-center gap-2 hover:bg-muted">
+                            <Ticket className="h-4 w-4" /> Still need help? Raise a ticket
+                          </button>
+                        )}
+                        {canManageKnowledge && <>
+                          <button type="button" onClick={() => { setKnowledgeForm({ id: article.id, title: article.title, category: article.category, summary: article.summary, tags: article.tags ?? "", stepsText: article.steps.join("\n") }); setKnowledgeFormOpen(true); }} className="h-9 px-3 rounded-md border text-sm inline-flex items-center gap-2 hover:bg-muted"><Pencil className="h-4 w-4" /> Edit guide</button>
+                          <button type="button" onClick={async () => { if (!confirm(`Delete the guide “${article.title}”? This cannot be undone.`)) return; const { error } = await (supabase.from("ict_knowledge_articles" as any) as any).delete().eq("id", article.id); if (error) { toast.error(error.message); return; } setKnowledgeArticles((prev) => prev.filter((item) => item.id !== article.id)); if (expandedArticle === article.id) setExpandedArticle(null); toast.success("Knowledge guide deleted"); }} className="h-9 px-3 rounded-md border border-destructive/40 text-destructive text-sm inline-flex items-center gap-2 hover:bg-destructive/5"><Trash2 className="h-4 w-4" /> Delete</button>
+                        </>}
+                      </div>
                     </div>
                   )}
                 </article>
@@ -787,6 +818,35 @@ function IctServiceDesk() {
           <p className="text-xs text-muted-foreground">For suspected account compromise, malware or a security incident, contact ICT immediately. Never share passwords or verification codes in a ticket.</p>
         </div>
       </section>
+
+      {knowledgeFormOpen && canManageKnowledge && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="knowledge-form-title">
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            const steps = knowledgeForm.stepsText.split("\n").map((step) => step.trim()).filter(Boolean);
+            if (!knowledgeForm.title.trim() || !knowledgeForm.summary.trim() || steps.length === 0) { toast.error("Enter a title, summary and at least one troubleshooting step."); return; }
+            setKnowledgeSaving(true);
+            const payload = { title: knowledgeForm.title.trim(), category: knowledgeForm.category, summary: knowledgeForm.summary.trim(), tags: knowledgeForm.tags.trim(), steps, active: true, updated_at: new Date().toISOString(), ...(user ? { updated_by: user.id } : {}) };
+            const query = knowledgeForm.id
+              ? await (supabase.from("ict_knowledge_articles" as any) as any).update(payload).eq("id", knowledgeForm.id)
+              : await (supabase.from("ict_knowledge_articles" as any) as any).insert({ ...payload, slug: `guide-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, created_by: user?.id ?? null });
+            setKnowledgeSaving(false);
+            if (query.error) { toast.error(query.error.message); return; }
+            toast.success(knowledgeForm.id ? "Knowledge guide updated" : "Knowledge guide added");
+            setKnowledgeFormOpen(false); setKnowledgeForm(EMPTY_KNOWLEDGE_FORM); await loadKnowledgeArticles();
+          }} className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border bg-card p-5 shadow-xl space-y-4">
+            <div className="flex items-center justify-between gap-3"><h2 id="knowledge-form-title" className="text-lg font-semibold">{knowledgeForm.id ? "Edit knowledge guide" : "Add knowledge guide"}</h2><button type="button" onClick={() => setKnowledgeFormOpen(false)} className="p-2 rounded-md hover:bg-muted" aria-label="Close guide editor"><X className="h-4 w-4" /></button></div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="text-sm space-y-1 sm:col-span-2">Guide title<input required maxLength={160} value={knowledgeForm.title} onChange={(e) => setKnowledgeForm((f) => ({ ...f, title: e.target.value }))} className="w-full h-10 px-3 rounded-md border bg-background" placeholder="e.g. How to connect to the office printer" /></label>
+              <label className="text-sm space-y-1">Category<select value={knowledgeForm.category} onChange={(e) => setKnowledgeForm((f) => ({ ...f, category: e.target.value }))} className="w-full h-10 px-3 rounded-md border bg-background">{KNOWLEDGE_EDIT_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
+              <label className="text-sm space-y-1">Search tags<input value={knowledgeForm.tags} onChange={(e) => setKnowledgeForm((f) => ({ ...f, tags: e.target.value }))} className="w-full h-10 px-3 rounded-md border bg-background" placeholder="printer, queue, paper" /></label>
+              <label className="text-sm space-y-1 sm:col-span-2">Short summary<textarea required maxLength={400} rows={2} value={knowledgeForm.summary} onChange={(e) => setKnowledgeForm((f) => ({ ...f, summary: e.target.value }))} className="w-full px-3 py-2 rounded-md border bg-background" placeholder="What this guide helps the user solve" /></label>
+              <label className="text-sm space-y-1 sm:col-span-2">Troubleshooting steps <span className="text-muted-foreground">(one step per line)</span><textarea required rows={8} value={knowledgeForm.stepsText} onChange={(e) => setKnowledgeForm((f) => ({ ...f, stepsText: e.target.value }))} className="w-full px-3 py-2 rounded-md border bg-background" placeholder={'1. Check the connection.\n2. Restart the approved application.\n3. Raise a ticket if it persists.'} /></label>
+            </div>
+            <div className="flex justify-end gap-2"><button type="button" onClick={() => setKnowledgeFormOpen(false)} className="h-9 px-4 rounded-md border text-sm">Cancel</button><button disabled={knowledgeSaving} type="submit" className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm disabled:opacity-50">{knowledgeSaving ? "Saving…" : knowledgeForm.id ? "Save changes" : "Add guide"}</button></div>
+          </form>
+        </div>
+      )}
 
       <div className="bg-card border rounded-lg overflow-hidden">
         <div className="px-4 py-3 border-b flex flex-wrap items-center justify-between gap-2">
