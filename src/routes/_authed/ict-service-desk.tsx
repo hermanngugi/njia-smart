@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import {
   Ticket, HardDrive, Wrench, AlertTriangle, Plus, X, Pencil, Trash2,
-  ChevronRight, ChevronDown, ListChecks, ShieldCheck, CheckCircle2,
+  ChevronRight, ChevronDown, ListChecks, ShieldCheck, CheckCircle2, BookOpen, Search, Wifi, Printer, Mail, ShieldAlert, KeyRound, AppWindow,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authed/ict-service-desk")({
@@ -23,6 +23,123 @@ const PRIORITIES = ["Low", "Medium", "High", "Critical"];
 const STATUSES = ["New", "In Progress", "On Hold", "Resolved", "Closed"];
 const EMPTY_FORM = { title: "", description: "", category: CATEGORIES[0], priority: "Medium", assigned_to: "", service_type: "general" };
 const EMPTY_ASSET_FORM = { id: "", name: "", description: "", quantity: "1", unit_cost: "", purchase_date: "", assigned_to: "" };
+
+const KNOWLEDGE_ARTICLES = [
+  {
+    id: "wifi-network",
+    title: "Cannot connect to the office network or Wi-Fi",
+    category: "Network",
+    summary: "Troubleshoot a lost or unstable network connection.",
+    tags: "internet wifi network connection browser",
+    steps: [
+      "Check that Wi-Fi is enabled and airplane mode is off, or reconnect the network cable securely.",
+      "Confirm whether other websites or approved applications can connect. If possible, check whether a colleague has the same issue.",
+      "Disconnect from the office Wi-Fi and reconnect using the approved network. Do not share the network password with unauthorised people.",
+      "Restart your computer if it is safe to do so. Do not reset routers or network equipment yourself.",
+      "If the issue continues, raise an ICT ticket and include the error message, location, time it started, and whether other users are affected.",
+    ],
+  },
+  {
+    id: "printer",
+    title: "Printer is not printing",
+    category: "Hardware",
+    summary: "Check printer status, paper, queue and connection before requesting support.",
+    tags: "printer print paper toner queue scan",
+    steps: [
+      "Check that the printer is powered on and shows no paper, toner, or jam warning.",
+      "Confirm that the correct office printer is selected in the print window.",
+      "Check whether the printer is paused or showing jobs stuck in the queue. Cancel only your own stuck job if possible.",
+      "Check that the computer and printer are connected to the approved office network, where applicable.",
+      "If it still fails, raise a ticket with the printer name, your computer, and any displayed error. Do not force paper out or open service panels if you are unsure.",
+    ],
+  },
+  {
+    id: "email",
+    title: "Email is not sending or receiving",
+    category: "Software",
+    summary: "Check connectivity, mailbox status and delivery errors.",
+    tags: "email outlook mailbox send receive attachment",
+    steps: [
+      "Confirm that your internet connection is working and reopen the approved email application or webmail.",
+      "Check the Outbox, Sent Items, Junk/Spam and mailbox storage warning, if shown.",
+      "Verify the recipient address and check whether the message includes an attachment that may be too large.",
+      "If you receive a delivery failure, keep the error text and note when the issue started.",
+      "Raise an ICT ticket if the problem persists. Never send your password or multi-factor authentication code in the ticket.",
+    ],
+  },
+  {
+    id: "password-access",
+    title: "Password, sign-in or account access problem",
+    category: "Access/Account",
+    summary: "Use approved account recovery and report unexpected access prompts.",
+    tags: "password login sign in account mfa authentication access",
+    steps: [
+      "Check that the username or email address is correct and that Caps Lock is not enabled.",
+      "Use only the organisation's approved password-reset or account-recovery process, if available.",
+      "If multi-factor authentication is requested, approve only a sign-in you initiated yourself.",
+      "Never share passwords, recovery codes, or one-time verification codes with anyone, including someone claiming to be ICT.",
+      "If your account may be compromised or you are unexpectedly locked out, raise an urgent ICT ticket and notify ICT through an approved channel.",
+    ],
+  },
+  {
+    id: "software-install",
+    title: "Need software installed or updated",
+    category: "Software",
+    summary: "Request approved software instead of installing unknown applications yourself.",
+    tags: "software install update application license admin rights",
+    steps: [
+      "Check whether the software is already available on your computer or through an approved company portal.",
+      "Raise an ICT ticket with the software name, business purpose, device name, and deadline.",
+      "Include the vendor's official website or the exact error message if relevant.",
+      "Do not bypass administrator controls, use unlicensed software, or download installers from unknown websites.",
+      "ICT will confirm compatibility, security and licensing before installation where required.",
+    ],
+  },
+  {
+    id: "phishing",
+    title: "Suspicious email, link or security warning",
+    category: "Security",
+    summary: "Safely report suspected phishing or unusual sign-in activity.",
+    tags: "phishing scam suspicious email malware security virus link",
+    steps: [
+      "Do not click links, open unexpected attachments, reply, or enter your password on a page opened from the message.",
+      "Do not forward the suspicious message to other colleagues. Use the organisation's approved reporting method if one is available.",
+      "Raise an ICT ticket and provide the sender, subject, time received, and a screenshot if safe to capture.",
+      "If you already clicked a link, entered credentials, or opened a suspicious file, contact ICT immediately and explain what happened.",
+      "Do not delete relevant evidence unless ICT instructs you to do so.",
+    ],
+  },
+  {
+    id: "slow-computer",
+    title: "Computer is slow or frequently freezes",
+    category: "Hardware",
+    summary: "Try safe checks and record the symptoms before escalating.",
+    tags: "slow computer laptop frozen performance restart",
+    steps: [
+      "Save your work and close applications and browser tabs you are not using.",
+      "Check whether the issue affects one application or the whole computer, and note any error messages.",
+      "Restart the computer when you have saved your work and no critical task is running.",
+      "Do not install cleaner tools, disable security software, or delete business files to free space.",
+      "Raise a ticket if the issue continues, including the device name, when it began, and which applications are affected.",
+    ],
+  },
+  {
+    id: "video-meetings",
+    title: "Camera or microphone not working in a meeting",
+    category: "Hardware",
+    summary: "Check device selection, permissions and physical connections.",
+    tags: "camera microphone headset audio video meeting teams zoom",
+    steps: [
+      "Check that the headset or camera is connected and not physically muted or covered.",
+      "In the meeting application's settings, select the intended microphone, speaker and camera.",
+      "Check the operating system's camera and microphone permissions for the approved meeting application.",
+      "Close other applications that may be using the device and rejoin the meeting if appropriate.",
+      "If it still fails, raise a ticket with the application name, device model and any error shown.",
+    ],
+  },
+];
+
+const KNOWLEDGE_CATEGORIES = ["All topics", "Network", "Hardware", "Software", "Access/Account", "Security"];
 
 const PRIORITY_COLORS: Record<string, string> = {
   Low: "bg-muted text-muted-foreground",
@@ -414,6 +531,9 @@ function IctServiceDesk() {
   const [maintenanceCount, setMaintenanceCount] = useState(0);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [typeFilter, setTypeFilter] = useState("");
+  const [knowledgeSearch, setKnowledgeSearch] = useState("");
+  const [knowledgeCategory, setKnowledgeCategory] = useState("All topics");
+  const [expandedArticle, setExpandedArticle] = useState<string | null>(null);
 
   const [assets, setAssets] = useState<Asset[]>([]);
   const [assetTotalQty, setAssetTotalQty] = useState(0);
@@ -572,6 +692,13 @@ function IctServiceDesk() {
     load();
   }
 
+  const filteredKnowledgeArticles = KNOWLEDGE_ARTICLES.filter((article) => {
+    const matchesCategory = knowledgeCategory === "All topics" || article.category === knowledgeCategory;
+    const query = knowledgeSearch.trim().toLowerCase();
+    const searchable = `${article.title} ${article.category} ${article.summary} ${article.tags} ${article.steps.join(" ")}`.toLowerCase();
+    return matchesCategory && (!query || searchable.includes(query));
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap justify-between items-center gap-3">
@@ -595,6 +722,71 @@ function IctServiceDesk() {
         <StatCard icon={Wrench} label="Active Maintenance" value={maintenanceCount} />
         <StatCard icon={AlertTriangle} label="Critical Issues" value={criticalCount} />
       </div>
+
+      <section className="bg-card border rounded-lg overflow-hidden" aria-labelledby="ict-knowledge-title">
+        <div className="px-4 py-4 border-b flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="rounded-lg bg-primary/10 p-2 text-primary"><BookOpen className="h-5 w-5" /></div>
+            <div>
+              <h2 id="ict-knowledge-title" className="font-semibold">ICT Knowledge Base</h2>
+              <p className="text-sm text-muted-foreground mt-1">Quick self-help guides for common office IT issues. Try a guide before raising a request.</p>
+            </div>
+          </div>
+          <span className="text-xs rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{KNOWLEDGE_ARTICLES.length} guides</span>
+        </div>
+        <div className="p-4 space-y-4">
+          <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_190px]">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <input
+                aria-label="Search ICT help guides"
+                value={knowledgeSearch}
+                onChange={(e) => setKnowledgeSearch(e.target.value)}
+                placeholder="Search printer, email, password, network…"
+                className="w-full h-10 pl-9 pr-3 rounded-md border bg-background text-sm"
+              />
+            </div>
+            <select aria-label="Filter ICT help by category" value={knowledgeCategory} onChange={(e) => setKnowledgeCategory(e.target.value)} className="h-10 px-3 rounded-md border bg-background text-sm">
+              {KNOWLEDGE_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}
+            </select>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {filteredKnowledgeArticles.map((article) => {
+              const isExpanded = expandedArticle === article.id;
+              const ArticleIcon = article.category === "Network" ? Wifi : article.category === "Software" ? AppWindow : article.category === "Access/Account" ? KeyRound : article.category === "Security" ? ShieldAlert : article.title.toLowerCase().includes("printer") ? Printer : article.title.toLowerCase().includes("email") ? Mail : BookOpen;
+              return (
+                <article key={article.id} className="rounded-lg border bg-background/50 overflow-hidden">
+                  <button type="button" onClick={() => setExpandedArticle(isExpanded ? null : article.id)} aria-expanded={isExpanded} className="w-full p-3 text-left flex items-start gap-3 hover:bg-muted/40 transition-colors">
+                    <span className="mt-0.5 rounded-md bg-muted p-2 text-muted-foreground"><ArticleIcon className="h-4 w-4" /></span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium text-sm">{article.title}</span>
+                        <span className="text-[10px] rounded-full bg-muted px-2 py-0.5 text-muted-foreground">{article.category}</span>
+                      </span>
+                      <span className="block text-xs text-muted-foreground mt-1">{article.summary}</span>
+                    </span>
+                    {isExpanded ? <ChevronDown className="h-4 w-4 mt-1 shrink-0" /> : <ChevronRight className="h-4 w-4 mt-1 shrink-0" />}
+                  </button>
+                  {isExpanded && (
+                    <div className="px-4 pb-4 pt-1 border-t">
+                      <ol className="list-decimal pl-5 space-y-2 text-sm text-muted-foreground">
+                        {article.steps.map((step, index) => <li key={`${article.id}-${index}`} className="pl-1">{step}</li>)}
+                      </ol>
+                      {canRaiseTicket && (
+                        <button type="button" onClick={() => { setForm({ ...EMPTY_FORM, category: article.category === "Network" || article.category === "Hardware" || article.category === "Software" || article.category === "Access/Account" ? article.category : "Other", title: `Help needed: ${article.title}` }); setFormOpen(true); }} className="mt-4 h-9 px-3 rounded-md border text-sm inline-flex items-center gap-2 hover:bg-muted">
+                          <Ticket className="h-4 w-4" /> Still need help? Raise a ticket
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </article>
+              );
+            })}
+            {filteredKnowledgeArticles.length === 0 && <div className="md:col-span-2 rounded-lg border border-dashed p-8 text-center"><BookOpen className="h-6 w-6 mx-auto text-muted-foreground" /><p className="mt-2 text-sm font-medium">No matching guides</p><p className="text-xs text-muted-foreground mt-1">Try another search term or choose All topics.</p></div>}
+          </div>
+          <p className="text-xs text-muted-foreground">For suspected account compromise, malware or a security incident, contact ICT immediately. Never share passwords or verification codes in a ticket.</p>
+        </div>
+      </section>
 
       <div className="bg-card border rounded-lg overflow-hidden">
         <div className="px-4 py-3 border-b flex flex-wrap items-center justify-between gap-2">
