@@ -4,27 +4,27 @@
 **Repository:** `hermanngugi/njia-smart`  
 **Branch:** `main`
 
-This manifest records the consolidated repair sequence applied to the live project. The SQL files are additive/guard-oriented and were applied in dependency order. Do not replay the archived drafts under `supabase/archive/unapplied-originals/`.
+This manifest records the consolidated repair sequence applied to the live project. The SQL files were applied in dependency order. The first 14 digits of each active migration filename now match the live Supabase migration-history version; the following segment preserves the original logical filename and timestamp. The 37 unapplied drafts are archived under `supabase/archive/unapplied-originals/` and must not be replayed.
 
 ## Applied sequence
 
 | Order | Migration | Scope |
 |---:|---|---|
-| 1 | `20261125221500_core_security_and_client_pause.sql` | Complete staff-role recognition, activation guard, paused-client policies |
-| 2 | `20261125223000_central_documents_and_storage_security.sql` | Central document library, metadata validation, restricted document and Storage rules |
-| 3 | `20261125224500_service_module_schema_repair.sql` | Service project and milestone schema drift |
-| 4 | `20261125230000_hr_leave_workflow_retention.sql` | Reliever workflow, two-stage approval, atomic handover, audited reset, archive instead of hard delete |
-| 5 | `20261125231500_task_workspace_weekly_planning.sql` | Weekly planning, task workspace, subtasks, outputs, progress and waiting-on-client |
-| 6 | `20261125233000_chat_notifications_repair.sql` | Team membership, personal chat hide/restore, mentions, notification actor |
-| 7 | `20261125234500_tax_filing_invoice_period_controls.sql` | Filing periods, duplicate prevention, monthly periods, invoice batching |
-| 8 | `20261125235000_tax_invoice_period_guard_fix.sql` | Invoice RPC ambiguity correction and one-filed-per-window guard |
-| 9 | `20261125240000_audit_review_signoff_controls.sql` | Risk/procedure links, reviewer assignment, controlled sign-off and completion gates |
-| 10 | `20261125241500_ict_knowledge_vault_security.sql` | ICT knowledge base, restricted encrypted vault and audit trail |
-| 11 | `20261125243000_task_notification_integrity.sql` | Notification actor immutability, subtask guard and task activity logging |
-| 12 | `20261125244500_security_definer_rpc_lockdown.sql` | Remove anonymous execution from public SECURITY DEFINER functions; set fixed search paths |
-| 13 | `20261125245500_revoke_trigger_function_rpc.sql` | Remove direct RPC execution from trigger functions |
-| 14 | `20261125250000_tax_period_window_and_pause_fix.sql` | Enforce filing window on inserts and exclude paused clients from batch scheduling |
-| 15 | `20261125251000_paused_client_storage_guard.sql` | Extend paused-client boundary to client document objects in Storage |
+| 1 | `20261125191448_20261125221500_core_security_and_client_pause.sql` | Complete staff-role recognition, activation guard, paused-client policies |
+| 2 | `20261125191524_20261125223000_central_documents_and_storage_security.sql` | Central document library, metadata validation, restricted document and Storage rules |
+| 3 | `20261125191541_20261125224500_service_module_schema_repair.sql` | Service project and milestone schema drift |
+| 4 | `20261125191603_20261125230000_hr_leave_workflow_retention.sql` | Reliever workflow, two-stage approval, atomic handover, audited reset, archive instead of hard delete |
+| 5 | `20261125191629_20261125231500_task_workspace_weekly_planning.sql` | Weekly planning, task workspace, subtasks, outputs, progress and waiting-on-client |
+| 6 | `20261125191644_20261125233000_chat_notifications_repair.sql` | Team membership, personal chat hide/restore, mentions, notification actor |
+| 7 | `20261125191709_20261125234500_tax_filing_invoice_period_controls.sql` | Filing periods, duplicate prevention, monthly periods, invoice batching |
+| 8 | `20261125191726_20261125235000_tax_invoice_period_guard_fix.sql` | Invoice RPC ambiguity correction and one-filed-per-window guard |
+| 9 | `20261125191744_20261125240000_audit_review_signoff_controls.sql` | Risk/procedure links, reviewer assignment, controlled sign-off and completion gates |
+| 10 | `20261125191802_20261125241500_ict_knowledge_vault_security.sql` | ICT knowledge base, restricted encrypted vault and audit trail |
+| 11 | `20261125191818_20261125243000_task_notification_integrity.sql` | Notification actor immutability, subtask guard and task activity logging |
+| 12 | `20261125191903_20261125244500_security_definer_rpc_lockdown.sql` | Remove anonymous execution from public SECURITY DEFINER functions; set fixed search paths |
+| 13 | `20261125191922_20261125245500_revoke_trigger_function_rpc.sql` | Remove direct RPC execution from trigger functions |
+| 14 | `20261125191944_20261125250000_tax_period_window_and_pause_fix.sql` | Enforce filing window on inserts and exclude paused clients from batch scheduling |
+| 15 | `20261125192017_20261125251000_paused_client_storage_guard.sql` | Extend paused-client boundary to client document objects in Storage |
 
 ## Superseded draft files
 
