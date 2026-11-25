@@ -34,7 +34,8 @@ This manifest records the consolidated repair sequence applied to the live proje
 | 22 | `20261125192721_20261125260000_paused_client_row_and_chat_guard.sql` | Restrict paused client rows and client-linked chat access |
 | 23 | `20261125192755_20261125261000_tax_document_module_guard.sql` | Keep tax filing documents behind Tax-module access |
 | 24 | `20261125192818_20261125262000_invoice_number_concurrency_guard.sql` | Serialize invoice number allocation across concurrent requests |
-| 25 | `20261125200628_20261125270000_security_definer_private_api_boundary.sql` | Move 42 privileged implementations into non-exposed `private` schema and preserve authenticated RPC signatures as invoker wrappers |\n| 26 | `20261125203916_consolidate_permissive_rls_policies.sql` | Consolidate 20 multiple-permissive-policy findings across 18 tables; split ALL policies by command, preserve restrictive guards, and apply auth.uid() initplan optimization to affected policies |
+| 25 | `20261125200628_20261125270000_security_definer_private_api_boundary.sql` | Move 42 privileged implementations into non-exposed `private` schema and preserve authenticated RPC signatures as invoker wrappers |
+| 26 | `20261125203916_consolidate_permissive_rls_policies.sql` | Consolidate 20 multiple-permissive-policy findings across 18 tables; split ALL policies by command, preserve restrictive guards, and apply auth.uid() initplan optimization to affected policies |
 | 27 | `20261125204519_fk_supporting_indexes_batch_01_advisory_audit.sql` | Add 28 FK-supporting indexes across advisory, announcements, audit and chat |
 | 28 | `20261125204538_fk_supporting_indexes_batch_02_client_documents_hr_ict.sql` | Add 28 FK-supporting indexes across client, documents, HR and ICT |
 | 29 | `20261125204544_fk_supporting_indexes_batch_03_invoices_leave_tasks.sql` | Add 28 FK-supporting indexes across invoices, leave, payments, tasks and related tables |
