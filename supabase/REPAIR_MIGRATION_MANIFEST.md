@@ -31,6 +31,9 @@ This manifest records the consolidated repair sequence applied to the live proje
 | 19 | `20261125192551_20261125254500_chat_membership_trigger_return_fix.sql` | Correct staff membership trigger return semantics |
 | 20 | `20261125192616_20261125255000_completion_invoice_access_guard.sql` | Enforce module assignment and paused-client checks in completion invoicing |
 | 21 | `20261125192641_20261125255500_internal_rpc_and_portal_guard.sql` | Restrict internal RPC helpers and client portal password changes |
+| 22 | `20261125192721_20261125260000_paused_client_row_and_chat_guard.sql` | Restrict paused client rows and client-linked chat access |
+| 23 | `20261125192755_20261125261000_tax_document_module_guard.sql` | Keep tax filing documents behind Tax-module access |
+| 24 | `20261125192818_20261125262000_invoice_number_concurrency_guard.sql` | Serialize invoice number allocation across concurrent requests |
 
 ## Superseded draft files
 
@@ -46,7 +49,7 @@ The live project was checked after deployment:
 - 67 public tables; all 67 have RLS enabled.
 - 16 restrictive paused-client guards on client-linked public tables.
 - Restricted-document and paused-client Storage guards present.
-- All 21 consolidated migrations appear in the live migration history.
+- All 24 consolidated migrations appear in the live migration history.
 - No public-schema SECURITY DEFINER function remains executable by `anon`.
 - No public-schema function remains with a mutable/unset search path.
 - Trigger functions are not directly executable by `authenticated`.
