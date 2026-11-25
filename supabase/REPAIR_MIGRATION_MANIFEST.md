@@ -34,7 +34,7 @@ This manifest records the consolidated repair sequence applied to the live proje
 | 22 | `20261125192721_20261125260000_paused_client_row_and_chat_guard.sql` | Restrict paused client rows and client-linked chat access |
 | 23 | `20261125192755_20261125261000_tax_document_module_guard.sql` | Keep tax filing documents behind Tax-module access |
 | 24 | `20261125192818_20261125262000_invoice_number_concurrency_guard.sql` | Serialize invoice number allocation across concurrent requests |
-| 25 | `20261125200628_20261125270000_security_definer_private_api_boundary.sql` | Move 42 privileged implementations into non-exposed `private` schema and preserve authenticated RPC signatures as invoker wrappers |
+| 25 | `20261125200628_20261125270000_security_definer_private_api_boundary.sql` | Move 42 privileged implementations into non-exposed `private` schema and preserve authenticated RPC signatures as invoker wrappers |\n| 26 | `20261125203916_consolidate_permissive_rls_policies.sql` | Consolidate 20 multiple-permissive-policy findings across 18 tables; split ALL policies by command, preserve restrictive guards, and apply auth.uid() initplan optimization to affected policies |
 
 ## Superseded draft files
 
@@ -50,8 +50,8 @@ The live project was checked after deployment:
 - 67 public tables; all 67 have RLS enabled.
 - 16 restrictive paused-client guards on client-linked public tables, plus a restrictive paused-client guard on `clients` itself.
 - Restricted-document and paused-client Storage guards present.
-- All 25 consolidated repair migrations appear in the live migration history.
-- All 95 active local migration filenames have unique version prefixes matching the live ledger; the two additional remote entries are the baseline files intentionally kept under `supabase/baseline/`.
+- All 26 consolidated repair migrations appear in the live migration history.
+- All 97 active local migration filenames have unique version prefixes matching the live ledger; the two additional remote entries are the baseline files intentionally kept under `supabase/baseline/`.
 - No `public`-schema SECURITY DEFINER function remains executable by `anon` or `authenticated`.
 - 42 SECURITY DEFINER implementations are in the non-exposed `private` schema; their public API wrappers run as SECURITY INVOKER and preserve the existing signatures.
 - Authenticated direct calls to user-ID permission helpers are restricted to the caller's own user ID.
