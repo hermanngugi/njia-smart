@@ -72,7 +72,7 @@ function HrPage() {
       supabase.from("user_roles").select("*"),
       supabase.from("hr_employment").select("*"),
       supabase.from("leave_types").select("*").eq("active", true).order("sort_order"),
-      supabase.from("leave_requests").select("*, profiles!leave_requests_employee_id_fkey(full_name)").order("created_at", { ascending: false }),
+      supabase.from("leave_requests").select("*, profiles!leave_requests_employee_id_fkey(full_name)").is("archived_at", null).order("created_at", { ascending: false }),
       supabase.from("leave_balances").select("*"),
       supabase.from("payslips").select("*").order("period", { ascending: false }),
       (supabase as any).rpc("list_leave_relievers"),
@@ -169,13 +169,13 @@ function HrPage() {
   }
 
   async function deleteLeaveRecord(id: string) {
-    if (!confirm("Permanently delete this finalized leave record? This cannot be undone.")) return;
+    if (!confirm("Archive this finalized leave record? It will be retained for audit.")) return;
     setBusy(true);
     const { error } = await supabase.rpc("delete_leave_record", { _id: id });
     setBusy(false);
     if (error) toast.error(error.message);
     else {
-      toast.success("Leave record deleted");
+      toast.success("Leave record archived");
       await load();
     }
   }
