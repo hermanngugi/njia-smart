@@ -35,6 +35,10 @@ This manifest records the consolidated repair sequence applied to the live proje
 | 23 | `20261125192755_20261125261000_tax_document_module_guard.sql` | Keep tax filing documents behind Tax-module access |
 | 24 | `20261125192818_20261125262000_invoice_number_concurrency_guard.sql` | Serialize invoice number allocation across concurrent requests |
 | 25 | `20261125200628_20261125270000_security_definer_private_api_boundary.sql` | Move 42 privileged implementations into non-exposed `private` schema and preserve authenticated RPC signatures as invoker wrappers |\n| 26 | `20261125203916_consolidate_permissive_rls_policies.sql` | Consolidate 20 multiple-permissive-policy findings across 18 tables; split ALL policies by command, preserve restrictive guards, and apply auth.uid() initplan optimization to affected policies |
+| 27 | `20261125204519_fk_supporting_indexes_batch_01_advisory_audit.sql` | Add 28 FK-supporting indexes across advisory, announcements, audit and chat |
+| 28 | `20261125204538_fk_supporting_indexes_batch_02_client_documents_hr_ict.sql` | Add 28 FK-supporting indexes across client, documents, HR and ICT |
+| 29 | `20261125204544_fk_supporting_indexes_batch_03_invoices_leave_tasks.sql` | Add 28 FK-supporting indexes across invoices, leave, payments, tasks and related tables |
+| 30 | `20261125204553_fk_supporting_indexes_batch_04_tax_and_remaining.sql` | Add the final 28 FK-supporting indexes, including tax relationships |
 
 ## Superseded draft files
 
@@ -50,8 +54,8 @@ The live project was checked after deployment:
 - 67 public tables; all 67 have RLS enabled.
 - 16 restrictive paused-client guards on client-linked public tables, plus a restrictive paused-client guard on `clients` itself.
 - Restricted-document and paused-client Storage guards present.
-- All 26 consolidated repair migrations appear in the live migration history.
-- All 97 active local migration filenames have unique version prefixes matching the live ledger; the two additional remote entries are the baseline files intentionally kept under `supabase/baseline/`.
+- All 30 consolidated repair migrations appear in the live migration history, including four staged FK-index batches (112 indexes across 55 tables).
+- All 101 active local migration filenames have unique version prefixes matching the live ledger; the two additional remote entries are the baseline files intentionally kept under `supabase/baseline/`.
 - No `public`-schema SECURITY DEFINER function remains executable by `anon` or `authenticated`.
 - 42 SECURITY DEFINER implementations are in the non-exposed `private` schema; their public API wrappers run as SECURITY INVOKER and preserve the existing signatures.
 - Authenticated direct calls to user-ID permission helpers are restricted to the caller's own user ID.
@@ -64,7 +68,7 @@ The live project was checked after deployment:
 
 Supabase Security Advisor still reports:
 - Leaked-password protection is disabled. Enable it in Supabase Dashboard → Authentication → Security and Password settings.
-- Performance Advisor reports pre-existing and newly surfaced index/RLS-policy optimization notices. These are not migration failures; address them in a separate measured optimization pass.
+- Performance Advisor still reports remaining RLS initplan findings (138 at the last check) and unused-index notices. All 112 missing foreign-key indexes have now been added; unused indexes remain in place pending workload evidence.
 
 ## Important operational note
 
