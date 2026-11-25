@@ -26,6 +26,7 @@ This manifest records the consolidated repair sequence applied to the live proje
 | 14 | `20261125191944_20261125250000_tax_period_window_and_pause_fix.sql` | Enforce filing window on inserts and exclude paused clients from batch scheduling |
 | 15 | `20261125192017_20261125251000_paused_client_storage_guard.sql` | Extend paused-client boundary to client document objects in Storage |
 | 16 | `20261125192319_20261125252000_ict_updated_at_triggers.sql` | Maintain ICT knowledge-base and vault update timestamps |
+| 17 | `20261125192452_20261125253000_task_output_owner_delete.sql` | Allow task output owners to delete their own Storage files |
 
 ## Superseded draft files
 
@@ -41,7 +42,7 @@ The live project was checked after deployment:
 - 67 public tables; all 67 have RLS enabled.
 - 16 restrictive paused-client guards on client-linked public tables.
 - Restricted-document and paused-client Storage guards present.
-- All 16 consolidated migrations appear in the live migration history.
+- All 17 consolidated migrations appear in the live migration history.
 - No public-schema SECURITY DEFINER function remains executable by `anon`.
 - No public-schema function remains with a mutable/unset search path.
 - Trigger functions are not directly executable by `authenticated`.
