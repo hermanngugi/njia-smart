@@ -19,7 +19,7 @@ This manifest records the consolidated repair sequence applied to the live proje
 | 7 | `20261125191709_20261125234500_tax_filing_invoice_period_controls.sql` | Filing periods, duplicate prevention, monthly periods, invoice batching |
 | 8 | `20261125191726_20261125235000_tax_invoice_period_guard_fix.sql` | Invoice RPC ambiguity correction and one-filed-per-window guard |
 | 9 | `20261125191744_20261125240000_audit_review_signoff_controls.sql` | Risk/procedure links, reviewer assignment, controlled sign-off and completion gates |
-| 10 | `20261125191802_20261125241500_ict_knowledge_vault_security.sql` | ICT knowledge base, restricted encrypted vault and audit trail |
+| 10 | `20261125191802_20261125241500_ict_knowledge_vault_security.sql` | ICT knowledge base, restricted encrypted vault and change audit trail |
 | 11 | `20261125191818_20261125243000_task_notification_integrity.sql` | Notification actor immutability, subtask guard and task activity logging |
 | 12 | `20261125191903_20261125244500_security_definer_rpc_lockdown.sql` | Remove anonymous execution from public SECURITY DEFINER functions; set fixed search paths |
 | 13 | `20261125191922_20261125245500_revoke_trigger_function_rpc.sql` | Remove direct RPC execution from trigger functions |
@@ -47,13 +47,14 @@ The profile backfill draft was not applied because its intended effect was alrea
 
 The live project was checked after deployment:
 - 67 public tables; all 67 have RLS enabled.
-- 16 restrictive paused-client guards on client-linked public tables.
+- 16 restrictive paused-client guards on client-linked public tables, plus a restrictive paused-client guard on `clients` itself.
 - Restricted-document and paused-client Storage guards present.
-- All 24 consolidated migrations appear in the live migration history.
+- All 24 consolidated repair migrations appear in the live migration history.
+- All 95 active local migration filenames have unique version prefixes matching the live ledger; the two additional remote entries are the baseline files intentionally kept under `supabase/baseline/`.
 - No public-schema SECURITY DEFINER function remains executable by `anon`.
 - No public-schema function remains with a mutable/unset search path.
 - Trigger functions are not directly executable by `authenticated`.
-- Private `task-outputs` bucket exists.
+- Private `task-outputs` bucket exists; uploaders and task leads can delete files according to the same ownership rules as task-output metadata.
 - The obsolete four-argument `request_leave` RPC was removed; the five-argument reliever-aware RPC remains.
 
 ## Outstanding platform/security follow-up
