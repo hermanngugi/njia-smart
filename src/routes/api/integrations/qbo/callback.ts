@@ -5,6 +5,7 @@ import {
   exchangeQboAuthorizationCode,
   getQboConfig,
   hashOAuthState,
+  QBO_REQUESTED_SCOPES,
   revokeQboTokens,
   storeQboCredentials,
   tokenExpiryDates,
@@ -138,7 +139,7 @@ export const Route = createFileRoute("/api/integrations/qbo/callback")({
                 environment: "sandbox",
                 external_account_id: realmId,
                 status: "pending",
-                scopes: ["com.intuit.quickbooks.accounting"],
+                scopes: [...QBO_REQUESTED_SCOPES],
                 connected_by: authorizationState.initiated_by,
                 created_by: authorizationState.initiated_by,
               })
@@ -173,6 +174,16 @@ export const Route = createFileRoute("/api/integrations/qbo/callback")({
             refreshTokenExpiresAt: expiries.refreshTokenExpiresAt,
             connectedBy: authorizationState.initiated_by,
           });
+
+          // Refresh the visible scope metadata after a successful re-consent as well.
+          const { error: scopeUpdateError } = await adminDb
+            .from("client_integrations")
+            .update({ scopes: [...QBO_REQUESTED_SCOPES] })
+            .eq("id", integrationId)
+            .eq("client_id", clientId);
+          if (scopeUpdateError) {
+            console.warn("[QBO OAuth] Connected, but requested-scope metadata could not be updated.");
+          }
 
           return Response.redirect(clientReturnUrl(config.redirectUri, clientId, "connected"), 303);
         } catch (error) {
