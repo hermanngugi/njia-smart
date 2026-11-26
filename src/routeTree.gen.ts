@@ -21,16 +21,8 @@ import { Route as AuthedAdvisoryRouteImport } from './routes/_authed/advisory'
 import { Route as AuthedAnnouncementsRouteImport } from './routes/_authed/announcements'
 import { Route as AuthedAuditRouteImport } from './routes/_authed/audit'
 import { Route as AuthedCalendarRouteImport } from './routes/_authed/calendar'
-import { Route as AuthedChatRouteImport } from './routes/_authed/chat'
 import { Route as AuthedDashboardRouteImport } from './routes/_authed/dashboard'
 import { Route as AuthedDocumentsRouteImport } from './routes/_authed/documents'
-import { Route as AuthedFinancialBusinessManagementRouteImport } from './routes/_authed/financial-business-management'
-import { Route as AuthedHrRouteImport } from './routes/_authed/hr'
-import { Route as AuthedIctRouteImport } from './routes/_authed/ict'
-import { Route as AuthedIctServiceDeskRouteImport } from './routes/_authed/ict-service-desk'
-import { Route as AuthedOutsourcedAccountingRouteImport } from './routes/_authed/outsourced-accounting'
-import { Route as AuthedPayrollManagementRouteImport } from './routes/_authed/payroll-management'
-import { Route as AuthedQuickLinksRouteImport } from './routes/_authed/quick-links'
 import { Route as AuthedSettingsRouteImport } from './routes/_authed/settings'
 import { Route as AuthedTasksRouteImport } from './routes/_authed/tasks'
 import { Route as AuthedTaxRouteImport } from './routes/_authed/tax'
@@ -41,7 +33,6 @@ import { Route as AuthedAccountsIdRouteImport } from './routes/_authed/accounts.
 import { Route as AuthedAuditIdRouteImport } from './routes/_authed/audit.$id'
 import { Route as AuthedClientsIndexRouteImport } from './routes/_authed/clients/index'
 import { Route as AuthedClientsIdRouteImport } from './routes/_authed/clients/$id'
-import { Route as AuthedHrIdRouteImport } from './routes/_authed/hr.$id'
 import { Route as AuthedTaxTypeRouteImport } from './routes/_authed/tax.$type'
 import { Route as AuthedTeamIdRouteImport } from './routes/_authed/team.$id'
 
@@ -106,11 +97,6 @@ const AuthedCalendarRoute = AuthedCalendarRouteImport.update({
   path: '/calendar',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedChatRoute = AuthedChatRouteImport.update({
-  id: '/chat',
-  path: '/chat',
-  getParentRoute: () => AuthedRoute,
-} as any)
 const AuthedDashboardRoute = AuthedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -119,43 +105,6 @@ const AuthedDashboardRoute = AuthedDashboardRouteImport.update({
 const AuthedDocumentsRoute = AuthedDocumentsRouteImport.update({
   id: '/documents',
   path: '/documents',
-  getParentRoute: () => AuthedRoute,
-} as any)
-const AuthedFinancialBusinessManagementRoute =
-  AuthedFinancialBusinessManagementRouteImport.update({
-    id: '/financial-business-management',
-    path: '/financial-business-management',
-    getParentRoute: () => AuthedRoute,
-  } as any)
-const AuthedHrRoute = AuthedHrRouteImport.update({
-  id: '/hr',
-  path: '/hr',
-  getParentRoute: () => AuthedRoute,
-} as any)
-const AuthedIctRoute = AuthedIctRouteImport.update({
-  id: '/ict',
-  path: '/ict',
-  getParentRoute: () => AuthedRoute,
-} as any)
-const AuthedIctServiceDeskRoute = AuthedIctServiceDeskRouteImport.update({
-  id: '/ict-service-desk',
-  path: '/ict-service-desk',
-  getParentRoute: () => AuthedRoute,
-} as any)
-const AuthedOutsourcedAccountingRoute =
-  AuthedOutsourcedAccountingRouteImport.update({
-    id: '/outsourced-accounting',
-    path: '/outsourced-accounting',
-    getParentRoute: () => AuthedRoute,
-  } as any)
-const AuthedPayrollManagementRoute = AuthedPayrollManagementRouteImport.update({
-  id: '/payroll-management',
-  path: '/payroll-management',
-  getParentRoute: () => AuthedRoute,
-} as any)
-const AuthedQuickLinksRoute = AuthedQuickLinksRouteImport.update({
-  id: '/quick-links',
-  path: '/quick-links',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedSettingsRoute = AuthedSettingsRouteImport.update({
@@ -209,11 +158,6 @@ const AuthedClientsIdRoute = AuthedClientsIdRouteImport.update({
   path: '/clients/$id',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedHrIdRoute = AuthedHrIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => AuthedHrRoute,
-} as any)
 const AuthedTaxTypeRoute = AuthedTaxTypeRouteImport.update({
   id: '/$type',
   path: '/$type',
@@ -237,16 +181,8 @@ export interface FileRoutesByFullPath {
   '/announcements': typeof AuthedAnnouncementsRoute
   '/audit': typeof AuthedAuditRouteWithChildren
   '/calendar': typeof AuthedCalendarRoute
-  '/chat': typeof AuthedChatRoute
   '/dashboard': typeof AuthedDashboardRoute
   '/documents': typeof AuthedDocumentsRoute
-  '/financial-business-management': typeof AuthedFinancialBusinessManagementRoute
-  '/hr': typeof AuthedHrRouteWithChildren
-  '/ict': typeof AuthedIctRoute
-  '/ict-service-desk': typeof AuthedIctServiceDeskRoute
-  '/outsourced-accounting': typeof AuthedOutsourcedAccountingRoute
-  '/payroll-management': typeof AuthedPayrollManagementRoute
-  '/quick-links': typeof AuthedQuickLinksRoute
   '/settings': typeof AuthedSettingsRoute
   '/tasks': typeof AuthedTasksRoute
   '/tax': typeof AuthedTaxRouteWithChildren
@@ -256,7 +192,6 @@ export interface FileRoutesByFullPath {
   '/accounts/$id': typeof AuthedAccountsIdRoute
   '/audit/$id': typeof AuthedAuditIdRoute
   '/clients/$id': typeof AuthedClientsIdRoute
-  '/hr/$id': typeof AuthedHrIdRoute
   '/tax/$type': typeof AuthedTaxTypeRoute
   '/team/$id': typeof AuthedTeamIdRoute
   '/clients/': typeof AuthedClientsIndexRoute
@@ -273,16 +208,8 @@ export interface FileRoutesByTo {
   '/announcements': typeof AuthedAnnouncementsRoute
   '/audit': typeof AuthedAuditRouteWithChildren
   '/calendar': typeof AuthedCalendarRoute
-  '/chat': typeof AuthedChatRoute
   '/dashboard': typeof AuthedDashboardRoute
   '/documents': typeof AuthedDocumentsRoute
-  '/financial-business-management': typeof AuthedFinancialBusinessManagementRoute
-  '/hr': typeof AuthedHrRouteWithChildren
-  '/ict': typeof AuthedIctRoute
-  '/ict-service-desk': typeof AuthedIctServiceDeskRoute
-  '/outsourced-accounting': typeof AuthedOutsourcedAccountingRoute
-  '/payroll-management': typeof AuthedPayrollManagementRoute
-  '/quick-links': typeof AuthedQuickLinksRoute
   '/settings': typeof AuthedSettingsRoute
   '/tasks': typeof AuthedTasksRoute
   '/tax': typeof AuthedTaxRouteWithChildren
@@ -292,7 +219,6 @@ export interface FileRoutesByTo {
   '/accounts/$id': typeof AuthedAccountsIdRoute
   '/audit/$id': typeof AuthedAuditIdRoute
   '/clients/$id': typeof AuthedClientsIdRoute
-  '/hr/$id': typeof AuthedHrIdRoute
   '/tax/$type': typeof AuthedTaxTypeRoute
   '/team/$id': typeof AuthedTeamIdRoute
   '/clients': typeof AuthedClientsIndexRoute
@@ -311,16 +237,8 @@ export interface FileRoutesById {
   '/_authed/announcements': typeof AuthedAnnouncementsRoute
   '/_authed/audit': typeof AuthedAuditRouteWithChildren
   '/_authed/calendar': typeof AuthedCalendarRoute
-  '/_authed/chat': typeof AuthedChatRoute
   '/_authed/dashboard': typeof AuthedDashboardRoute
   '/_authed/documents': typeof AuthedDocumentsRoute
-  '/_authed/financial-business-management': typeof AuthedFinancialBusinessManagementRoute
-  '/_authed/hr': typeof AuthedHrRouteWithChildren
-  '/_authed/ict': typeof AuthedIctRoute
-  '/_authed/ict-service-desk': typeof AuthedIctServiceDeskRoute
-  '/_authed/outsourced-accounting': typeof AuthedOutsourcedAccountingRoute
-  '/_authed/payroll-management': typeof AuthedPayrollManagementRoute
-  '/_authed/quick-links': typeof AuthedQuickLinksRoute
   '/_authed/settings': typeof AuthedSettingsRoute
   '/_authed/tasks': typeof AuthedTasksRoute
   '/_authed/tax': typeof AuthedTaxRouteWithChildren
@@ -330,7 +248,6 @@ export interface FileRoutesById {
   '/_authed/accounts/$id': typeof AuthedAccountsIdRoute
   '/_authed/audit/$id': typeof AuthedAuditIdRoute
   '/_authed/clients/$id': typeof AuthedClientsIdRoute
-  '/_authed/hr/$id': typeof AuthedHrIdRoute
   '/_authed/tax/$type': typeof AuthedTaxTypeRoute
   '/_authed/team/$id': typeof AuthedTeamIdRoute
   '/_authed/clients/': typeof AuthedClientsIndexRoute
@@ -349,16 +266,8 @@ export interface FileRouteTypes {
     | '/announcements'
     | '/audit'
     | '/calendar'
-    | '/chat'
     | '/dashboard'
     | '/documents'
-    | '/financial-business-management'
-    | '/hr'
-    | '/ict'
-    | '/ict-service-desk'
-    | '/outsourced-accounting'
-    | '/payroll-management'
-    | '/quick-links'
     | '/settings'
     | '/tasks'
     | '/tax'
@@ -368,7 +277,6 @@ export interface FileRouteTypes {
     | '/accounts/$id'
     | '/audit/$id'
     | '/clients/$id'
-    | '/hr/$id'
     | '/tax/$type'
     | '/team/$id'
     | '/clients/'
@@ -385,16 +293,8 @@ export interface FileRouteTypes {
     | '/announcements'
     | '/audit'
     | '/calendar'
-    | '/chat'
     | '/dashboard'
     | '/documents'
-    | '/financial-business-management'
-    | '/hr'
-    | '/ict'
-    | '/ict-service-desk'
-    | '/outsourced-accounting'
-    | '/payroll-management'
-    | '/quick-links'
     | '/settings'
     | '/tasks'
     | '/tax'
@@ -404,7 +304,6 @@ export interface FileRouteTypes {
     | '/accounts/$id'
     | '/audit/$id'
     | '/clients/$id'
-    | '/hr/$id'
     | '/tax/$type'
     | '/team/$id'
     | '/clients'
@@ -422,16 +321,8 @@ export interface FileRouteTypes {
     | '/_authed/announcements'
     | '/_authed/audit'
     | '/_authed/calendar'
-    | '/_authed/chat'
     | '/_authed/dashboard'
     | '/_authed/documents'
-    | '/_authed/financial-business-management'
-    | '/_authed/hr'
-    | '/_authed/ict'
-    | '/_authed/ict-service-desk'
-    | '/_authed/outsourced-accounting'
-    | '/_authed/payroll-management'
-    | '/_authed/quick-links'
     | '/_authed/settings'
     | '/_authed/tasks'
     | '/_authed/tax'
@@ -441,7 +332,6 @@ export interface FileRouteTypes {
     | '/_authed/accounts/$id'
     | '/_authed/audit/$id'
     | '/_authed/clients/$id'
-    | '/_authed/hr/$id'
     | '/_authed/tax/$type'
     | '/_authed/team/$id'
     | '/_authed/clients/'
@@ -544,13 +434,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedCalendarRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/chat': {
-      id: '/_authed/chat'
-      path: '/chat'
-      fullPath: '/chat'
-      preLoaderRoute: typeof AuthedChatRouteImport
-      parentRoute: typeof AuthedRoute
-    }
     '/_authed/dashboard': {
       id: '/_authed/dashboard'
       path: '/dashboard'
@@ -563,55 +446,6 @@ declare module '@tanstack/react-router' {
       path: '/documents'
       fullPath: '/documents'
       preLoaderRoute: typeof AuthedDocumentsRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/financial-business-management': {
-      id: '/_authed/financial-business-management'
-      path: '/financial-business-management'
-      fullPath: '/financial-business-management'
-      preLoaderRoute: typeof AuthedFinancialBusinessManagementRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/hr': {
-      id: '/_authed/hr'
-      path: '/hr'
-      fullPath: '/hr'
-      preLoaderRoute: typeof AuthedHrRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/ict': {
-      id: '/_authed/ict'
-      path: '/ict'
-      fullPath: '/ict'
-      preLoaderRoute: typeof AuthedIctRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/ict-service-desk': {
-      id: '/_authed/ict-service-desk'
-      path: '/ict-service-desk'
-      fullPath: '/ict-service-desk'
-      preLoaderRoute: typeof AuthedIctServiceDeskRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/outsourced-accounting': {
-      id: '/_authed/outsourced-accounting'
-      path: '/outsourced-accounting'
-      fullPath: '/outsourced-accounting'
-      preLoaderRoute: typeof AuthedOutsourcedAccountingRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/payroll-management': {
-      id: '/_authed/payroll-management'
-      path: '/payroll-management'
-      fullPath: '/payroll-management'
-      preLoaderRoute: typeof AuthedPayrollManagementRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/quick-links': {
-      id: '/_authed/quick-links'
-      path: '/quick-links'
-      fullPath: '/quick-links'
-      preLoaderRoute: typeof AuthedQuickLinksRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/settings': {
@@ -684,13 +518,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedClientsIdRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/hr/$id': {
-      id: '/_authed/hr/$id'
-      path: '/$id'
-      fullPath: '/hr/$id'
-      preLoaderRoute: typeof AuthedHrIdRouteImport
-      parentRoute: typeof AuthedHrRoute
-    }
     '/_authed/tax/$type': {
       id: '/_authed/tax/$type'
       path: '/$type'
@@ -732,18 +559,6 @@ const AuthedAuditRouteWithChildren = AuthedAuditRoute._addFileChildren(
   AuthedAuditRouteChildren,
 )
 
-interface AuthedHrRouteChildren {
-  AuthedHrIdRoute: typeof AuthedHrIdRoute
-}
-
-const AuthedHrRouteChildren: AuthedHrRouteChildren = {
-  AuthedHrIdRoute: AuthedHrIdRoute,
-}
-
-const AuthedHrRouteWithChildren = AuthedHrRoute._addFileChildren(
-  AuthedHrRouteChildren,
-)
-
 interface AuthedTaxRouteChildren {
   AuthedTaxTypeRoute: typeof AuthedTaxTypeRoute
 }
@@ -775,16 +590,8 @@ interface AuthedRouteChildren {
   AuthedAnnouncementsRoute: typeof AuthedAnnouncementsRoute
   AuthedAuditRoute: typeof AuthedAuditRouteWithChildren
   AuthedCalendarRoute: typeof AuthedCalendarRoute
-  AuthedChatRoute: typeof AuthedChatRoute
   AuthedDashboardRoute: typeof AuthedDashboardRoute
   AuthedDocumentsRoute: typeof AuthedDocumentsRoute
-  AuthedFinancialBusinessManagementRoute: typeof AuthedFinancialBusinessManagementRoute
-  AuthedHrRoute: typeof AuthedHrRouteWithChildren
-  AuthedIctRoute: typeof AuthedIctRoute
-  AuthedIctServiceDeskRoute: typeof AuthedIctServiceDeskRoute
-  AuthedOutsourcedAccountingRoute: typeof AuthedOutsourcedAccountingRoute
-  AuthedPayrollManagementRoute: typeof AuthedPayrollManagementRoute
-  AuthedQuickLinksRoute: typeof AuthedQuickLinksRoute
   AuthedSettingsRoute: typeof AuthedSettingsRoute
   AuthedTasksRoute: typeof AuthedTasksRoute
   AuthedTaxRoute: typeof AuthedTaxRouteWithChildren
@@ -800,17 +607,8 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAnnouncementsRoute: AuthedAnnouncementsRoute,
   AuthedAuditRoute: AuthedAuditRouteWithChildren,
   AuthedCalendarRoute: AuthedCalendarRoute,
-  AuthedChatRoute: AuthedChatRoute,
   AuthedDashboardRoute: AuthedDashboardRoute,
   AuthedDocumentsRoute: AuthedDocumentsRoute,
-  AuthedFinancialBusinessManagementRoute:
-    AuthedFinancialBusinessManagementRoute,
-  AuthedHrRoute: AuthedHrRouteWithChildren,
-  AuthedIctRoute: AuthedIctRoute,
-  AuthedIctServiceDeskRoute: AuthedIctServiceDeskRoute,
-  AuthedOutsourcedAccountingRoute: AuthedOutsourcedAccountingRoute,
-  AuthedPayrollManagementRoute: AuthedPayrollManagementRoute,
-  AuthedQuickLinksRoute: AuthedQuickLinksRoute,
   AuthedSettingsRoute: AuthedSettingsRoute,
   AuthedTasksRoute: AuthedTasksRoute,
   AuthedTaxRoute: AuthedTaxRouteWithChildren,
