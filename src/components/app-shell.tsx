@@ -276,7 +276,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div
-        className={`fixed inset-0 bg-black/40 z-30 transition-opacity duration-300 ${open ? (pinned ? "opacity-100 lg:opacity-0 lg:pointer-events-none" : "opacity-100") : "opacity-0 pointer-events-none"}`}
+        aria-hidden="true"
+        className={`app-sidebar-backdrop fixed inset-0 bg-black/40 z-30 transition-opacity duration-300 ${open ? (pinned ? "opacity-100 lg:opacity-0 lg:pointer-events-none" : "opacity-100") : "opacity-0 pointer-events-none"}`}
         onClick={() => setOpen(false)}
       />
 
