@@ -5,6 +5,7 @@ import {
   exchangeQboAuthorizationCode,
   getQboConfig,
   hashOAuthState,
+  revokeQboTokens,
   storeQboCredentials,
   tokenExpiryDates,
 } from "@/lib/integrations/qbo.server";
@@ -105,6 +106,7 @@ export const Route = createFileRoute("/api/integrations/qbo/callback")({
 
         let integrationId: string | null = null;
         let createdNewIntegration = false;
+        let issuedTokens: Awaited<ReturnType<typeof exchangeQboAuthorizationCode>> | null = null;
 
         try {
           const existingResult = await adminDb
@@ -160,6 +162,7 @@ export const Route = createFileRoute("/api/integrations/qbo/callback")({
 
           // Intuit authorization codes are one-time use. Exchange them once only.
           const tokens = await exchangeQboAuthorizationCode(config, code);
+          issuedTokens = tokens;
           const expiries = tokenExpiryDates(tokens);
           const credentials = credentialBundle(tokens, expiries.hardExpiryAt);
 
@@ -175,6 +178,14 @@ export const Route = createFileRoute("/api/integrations/qbo/callback")({
         } catch (error) {
           // Never log authorization codes, tokens, client secrets or raw provider payloads.
           console.error("[QBO OAuth] Callback failed:", error instanceof Error ? error.name : "UnknownError");
+
+          if (issuedTokens) {
+            try {
+              await revokeQboTokens(config, credentialBundle(issuedTokens));
+            } catch {
+              // Keep this response generic; never log or expose token material.
+            }
+          }
 
           if (createdNewIntegration && integrationId) {
             await adminDb
