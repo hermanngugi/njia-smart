@@ -24,7 +24,10 @@ returns boolean language sql stable security definer set search_path = public as
   )
 $$;
 
-alter policy "chat channels insert staff" on public.chat_channels
+-- The reconstructed baseline creates no policies, so create (not alter) it.
+drop policy if exists "chat channels insert staff" on public.chat_channels;
+create policy "chat channels insert staff" on public.chat_channels
+  for insert to authenticated
   with check (
     public.is_staff(auth.uid()) and created_by = auth.uid()
     and (

@@ -81,8 +81,8 @@ $$;
 
 -- Backfill: any row already marked filed but missing the timestamp. We don't
 -- know the real filing moment for these, so use the closest thing on record
--- (when it was last assigned/touched) rather than "now", which would make
+-- (when it was assigned, else created) rather than "now", which would make
 -- old filings look like they just happened.
 UPDATE public.tax_returns
-SET filed_at = COALESCE(assigned_at, updated_at, now())
+SET filed_at = COALESCE(assigned_at, created_at, now())
 WHERE status = 'filed' AND filed_at IS NULL;
