@@ -51,7 +51,7 @@ export function getQboConfig(): QboConfig {
     ...(!redirectUri ? ["QBO_REDIRECT_URI"] : []),
   ];
   if (missing.length) {
-    throw new Error(\`QuickBooks development configuration is incomplete: \${missing.join(", ")}\`);
+    throw new Error(`QuickBooks development configuration is incomplete: ${missing.join(", ")}`);
   }
 
   if (environment !== "sandbox") {
@@ -105,7 +105,7 @@ export function buildQboAuthorizationUrl(config: QboConfig, state: string): stri
 }
 
 function basicAuthorization(config: QboConfig): string {
-  return \`Basic \${btoa(\`\${config.clientId}:\${config.clientSecret}\`)}\`;
+  return `Basic ${btoa(`${config.clientId}:${config.clientSecret}`)}`;
 }
 
 async function tokenRequest(
@@ -129,7 +129,7 @@ async function tokenRequest(
     | null;
 
   if (!response.ok || !payload || !payload.access_token || !payload.refresh_token || !payload.token_type) {
-    const errorCode = typeof payload?.error === "string" ? payload.error.slice(0, 80) : \`http_\${response.status}\`;
+    const errorCode = typeof payload?.error === "string" ? payload.error.slice(0, 80) : `http_${response.status}`;
     throw new QboOAuthError(errorCode, "Intuit did not return a valid token response.");
   }
 
@@ -236,7 +236,7 @@ export async function revokeQboTokens(config: QboConfig, credentials: QboCredent
   });
   if (!response.ok) {
     throw new QboOAuthError(
-      \`revoke_http_\${response.status}\`,
+      `revoke_http_${response.status}`,
       "Intuit could not confirm token revocation. The connection has been kept so it can be retried.",
     );
   }
