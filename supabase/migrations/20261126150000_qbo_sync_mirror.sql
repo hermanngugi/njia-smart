@@ -37,6 +37,8 @@ comment on table public.integration_external_records is
 comment on column public.integration_external_records.record_data is
   'Allow-listed provider fields only. Do not store OAuth tokens, payment card data, raw API responses, or unnecessary personal data.';
 
+create index if not exists integration_external_records_integration_client_idx
+  on public.integration_external_records (integration_id, client_id);
 create index if not exists integration_external_records_client_type_idx
   on public.integration_external_records (client_id, integration_id, external_record_type, synced_at desc);
 create index if not exists integration_external_records_modified_idx
