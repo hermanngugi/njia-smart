@@ -45,6 +45,7 @@
 }
 
 :root {
+  color-scheme: light;
   --radius: 0.5rem;
   --background: oklch(0.99 0.003 250);
   --foreground: oklch(0.18 0.04 265);
@@ -83,39 +84,86 @@
 }
 
 .dark {
-  --background: oklch(0.16 0.03 265);
-  --foreground: oklch(0.98 0 0);
-  --card: oklch(0.22 0.04 268);
-  --card-foreground: oklch(0.98 0 0);
-  --popover: oklch(0.22 0.04 268);
-  --popover-foreground: oklch(0.98 0 0);
-  --primary: oklch(0.55 0.18 273);
+  color-scheme: dark;
+  --background: oklch(0.20 0.025 265);
+  --foreground: oklch(0.96 0 0);
+  --card: oklch(0.255 0.035 268);
+  --card-foreground: oklch(0.96 0 0);
+  --popover: oklch(0.27 0.035 268);
+  --popover-foreground: oklch(0.96 0 0);
+  --primary: oklch(0.56 0.16 273);
   --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.28 0.04 265);
-  --secondary-foreground: oklch(0.98 0 0);
-  --muted: oklch(0.28 0.04 265);
-  --muted-foreground: oklch(0.7 0.03 260);
-  --accent: oklch(0.66 0.21 35);
+  --secondary: oklch(0.32 0.035 265);
+  --secondary-foreground: oklch(0.96 0 0);
+  --muted: oklch(0.32 0.035 265);
+  --muted-foreground: oklch(0.78 0.025 260);
+  --accent: oklch(0.70 0.19 35);
   --accent-foreground: oklch(0.99 0 0);
-  --destructive: oklch(0.65 0.2 27);
+  --destructive: oklch(0.70 0.18 27);
   --destructive-foreground: oklch(0.99 0 0);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.55 0.18 273);
-  --chart-1: oklch(0.55 0.18 273);
-  --chart-2: oklch(0.66 0.21 35);
-  --chart-3: oklch(0.65 0.15 220);
-  --chart-4: oklch(0.7 0.15 150);
-  --chart-5: oklch(0.65 0.18 320);
-  --sidebar: oklch(0.18 0.04 268);
+  --border: oklch(1 0 0 / 20%);
+  --input: oklch(1 0 0 / 24%);
+  --ring: oklch(0.68 0.16 273);
+  --chart-1: oklch(0.70 0.16 273);
+  --chart-2: oklch(0.74 0.17 35);
+  --chart-3: oklch(0.72 0.14 220);
+  --chart-4: oklch(0.78 0.14 150);
+  --chart-5: oklch(0.74 0.16 320);
+  --sidebar: oklch(0.20 0.035 268);
   --sidebar-foreground: oklch(0.96 0 0);
-  --sidebar-primary: oklch(0.66 0.21 35);
+  --sidebar-primary: oklch(0.70 0.19 35);
   --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.28 0.05 270);
+  --sidebar-accent: oklch(0.32 0.045 270);
   --sidebar-accent-foreground: oklch(0.98 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.66 0.21 35);
+  --sidebar-border: oklch(1 0 0 / 16%);
+  --sidebar-ring: oklch(0.70 0.19 35);
 }
+
+/* Improve the visibility of common status colours used by older widgets.
+   Semantic theme classes (text-primary, text-destructive, etc.) already
+   follow the theme tokens; these cover fixed Tailwind colour utilities. */
+.dark .text-emerald-600,
+.dark .text-green-600 {
+  color: oklch(0.82 0.15 155);
+}
+
+.dark .text-amber-600,
+.dark .text-yellow-600 {
+  color: oklch(0.84 0.16 85);
+}
+
+.dark .text-orange-600 {
+  color: oklch(0.80 0.17 45);
+}
+
+.dark .text-blue-600,
+.dark .text-sky-600,
+.dark .text-cyan-600 {
+  color: oklch(0.80 0.12 235);
+}
+
+.dark .text-indigo-600,
+.dark .text-violet-600,
+.dark .text-purple-600 {
+  color: oklch(0.79 0.13 285);
+}
+
+.dark .text-red-600,
+.dark .text-rose-600 {
+  color: oklch(0.76 0.16 25);
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: var(--muted-foreground);
+  opacity: 1;
+}
+
+.dark button svg.opacity-50,
+.dark [role="button"] svg.opacity-50 {
+  opacity: 0.75;
+}
+
 
 @layer base {
   * { border-color: var(--color-border); }
