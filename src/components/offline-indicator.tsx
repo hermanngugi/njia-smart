@@ -66,7 +66,7 @@ export function OfflineIndicator({ paths }: { paths: string[] }) {
         </button>
 
         {open && (
-          <div className="max-sm:fixed max-sm:inset-x-2 max-sm:top-16 sm:absolute sm:right-0 sm:mt-2 sm:w-80 rounded-lg border bg-popover text-popover-foreground shadow-lg z-50 p-3 space-y-3 text-sm">
+          <div className="max-sm:fixed max-sm:inset-x-2 max-sm:top-16 sm:absolute sm:right-0 sm:mt-2 sm:w-80 max-sm:max-h-[calc(100dvh-5rem)] max-sm:overflow-y-auto rounded-lg border bg-popover text-popover-foreground shadow-lg z-50 p-3 space-y-3 text-sm">
             <div>
               <div className="font-medium">{s.online ? "Online" : "Offline"}</div>
               <div className="text-xs text-muted-foreground">
