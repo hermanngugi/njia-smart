@@ -93,7 +93,7 @@ export function NotificationBell() {
         )}
       </button>
       {open && (
-        <div className="max-sm:fixed max-sm:inset-x-2 max-sm:top-16 sm:absolute sm:right-0 sm:mt-2 sm:w-80 max-h-96 overflow-auto bg-card border rounded-lg shadow-lg z-50">
+        <div className="max-sm:fixed max-sm:inset-x-2 max-sm:top-16 sm:absolute sm:right-0 sm:mt-2 sm:w-80 max-h-96 max-sm:max-h-[calc(100dvh-5rem)] overflow-auto bg-card border rounded-lg shadow-lg z-50">
           <div className="flex items-center justify-between p-3 border-b">
             <div className="font-semibold text-sm">Notifications</div>
             <div className="flex items-center gap-3">
