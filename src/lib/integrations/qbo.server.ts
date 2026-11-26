@@ -265,7 +265,7 @@ async function markQboReconnectRequired(integrationId: string, code: string) {
 }
 
 /**
- * Server-only access-token helper for subsequent read-only QBO API calls.
+ * Server-only access-token helper for subsequent QuickBooks API calls.
  * Intuit rotates refresh tokens. A database lock ensures only one invocation
  * can exchange a refresh token at a time.
  */
