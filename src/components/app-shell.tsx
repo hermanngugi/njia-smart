@@ -152,7 +152,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <aside
         onMouseEnter={onSidebarEnter}
         onMouseLeave={onSidebarLeave}
-        id="primary-sidebar"\n        className={`app-sidebar fixed inset-y-0 left-0 z-40 h-screen w-[min(18rem,calc(100vw-1rem))] bg-sidebar text-sidebar-foreground flex flex-col overflow-hidden shadow-xl transition-[transform,width] duration-300 ease-in-out lg:translate-x-0 ${
+        id="primary-sidebar"
+        className={`app-sidebar fixed inset-y-0 left-0 z-40 h-screen w-[min(18rem,calc(100vw-1rem))] bg-sidebar text-sidebar-foreground flex flex-col overflow-hidden shadow-xl transition-[transform,width] duration-300 ease-in-out lg:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         } ${expanded ? "lg:w-64" : "lg:w-16"} ${expanded && !pinned ? "" : "lg:shadow-none"}`}
       >
@@ -286,8 +287,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className={`app-main-column flex min-h-screen min-w-0 w-full flex-col transition-[margin-left] duration-300 ease-in-out ${pinned ? "lg:ml-64" : "lg:ml-16"}`}>
         <header className="app-topbar h-14 min-w-0 border-b bg-card flex items-center px-2 sm:px-4 gap-2 sm:gap-3 sticky top-0 z-20">
           <button
-            className={`p-2 -ml-2 rounded-md hover:bg-muted ${pinned ? "lg:hidden" : ""}`}
+            className={`p-2 -ml-1 sm:-ml-2 shrink-0 rounded-md hover:bg-muted ${pinned ? "lg:hidden" : ""}`}
             onClick={() => setOpen(true)}
+            aria-label="Open navigation menu"
+            aria-controls="primary-sidebar"
+            aria-expanded={open}
           >
             <Menu className="h-5 w-5" />
           </button>
