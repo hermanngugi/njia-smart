@@ -5,16 +5,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { useLiveRefresh } from "@/hooks/use-live-refresh";
 import { formatDate, formatDateTime, daysUntil, STATUS_COLORS } from "@/lib/format";
-import { NO_WEEK, weekLabel, weekOf } from "@/lib/task-weeks";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
-type Detail = { task: any; sender: string | null; supervisor: string | null };
+type Detail = { task: any; sender: string | null };
 
 /**
  * Pops up for the signed-in person whenever a task is assigned to them: who sent
- * it, when, and the full instructions (description, client, priority, due date,
- * planned week, supervisor). Works for tasks that arrive while they are online
+ * it, when, and the full instructions (description, client, priority, due date). Works for tasks that arrive while they are online
  * and for ones sent while they were away (shown on their next visit).
  * Closing the popup marks that notification read; it stays in the bell either way.
  */
@@ -56,11 +54,11 @@ export function TaskAssignedPopup() {
     setLoading(true);
     (async () => {
       const { data: task } = await supabase.from("tasks").select("*, clients(company_name)").eq("id", taskId).maybeSingle();
-      const ids = [current.actor_id, (task as any)?.supervisor_id].filter(Boolean) as string[];
+      const ids = [current.actor_id].filter(Boolean) as string[];
       const { data: people } = ids.length ? await supabase.from("profiles").select("id, full_name").in("id", ids) : { data: [] as any[] };
       if (cancelled) return;
       const name = (id?: string | null) => (id ? (people ?? []).find((p: any) => p.id === id)?.full_name ?? null : null);
-      setDetail(task ? { task, sender: name(current.actor_id), supervisor: name((task as any).supervisor_id) } : null);
+      setDetail(task ? { task, sender: name(current.actor_id) } : null);
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -78,7 +76,6 @@ export function TaskAssignedPopup() {
   if (!current) return null;
   const t = detail?.task;
   const days = t ? daysUntil(t.due_date) : null;
-  const wk = t ? weekOf(t) : NO_WEEK;
 
   return (
     <Dialog open onOpenChange={o => { if (!o) acknowledge(false); }}>
@@ -116,8 +113,6 @@ export function TaskAssignedPopup() {
                   {days !== null && <span className={days < 0 ? "text-destructive" : "text-muted-foreground"}>{days < 0 ? ` · ${-days}d overdue` : days === 0 ? " · today" : ` · in ${days}d`}</span>}
                 </dd>
               </div>
-              <div><dt className="text-muted-foreground">Planned week</dt><dd className="font-medium">{wk === NO_WEEK ? "—" : weekLabel(wk)}</dd></div>
-              {detail?.supervisor && <div className="col-span-2"><dt className="text-muted-foreground">Supervisor (gives guidance)</dt><dd className="font-medium">{detail.supervisor}</dd></div>}
             </dl>
           </div>
         ) : !loading && (
