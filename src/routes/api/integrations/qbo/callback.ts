@@ -24,7 +24,7 @@ function callbackError(message: string, status = 400) {
 }
 
 function clientReturnUrl(redirectUri: string, clientId: string, result: string) {
-  const url = new URL(\`/clients/\${encodeURIComponent(clientId)}\`, new URL(redirectUri).origin);
+  const url = new URL("/clients/" + encodeURIComponent(clientId), new URL(redirectUri).origin);
   url.searchParams.set("tab", "Integrations");
   url.searchParams.set("qbo", result);
   return url;
