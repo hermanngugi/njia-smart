@@ -8,9 +8,16 @@ import {
   createOAuthState,
   getQboConfig,
   hashOAuthState,
+  QBO_REQUESTED_SCOPES,
   readQboCredentials,
   revokeQboTokens,
 } from "@/lib/integrations/qbo.server";
+import {
+  captureQboSandboxCharge as requestQboSandboxCapture,
+  createQboSandboxCharge as requestQboSandboxCharge,
+  getQboCompanyInfo as requestQboCompanyInfo,
+  getQboOpenIdUserInfo as requestQboOpenIdUserInfo,
+} from "@/lib/integrations/qbo.api.server";
 
 const adminDb = supabaseAdmin as any;
 
@@ -56,7 +63,7 @@ export const startQboAuthorization = createServerFn({ method: "POST" })
       provider: "quickbooks_online",
       environment: "sandbox",
       state_hash: stateHash,
-      requested_scopes: ["com.intuit.quickbooks.accounting"],
+      requested_scopes: [...QBO_REQUESTED_SCOPES],
       initiated_by: context.userId,
       expires_at: expiresAt,
     });
@@ -127,4 +134,115 @@ export const disconnectQboConnection = createServerFn({ method: "POST" })
     await clearQboCredentials(data.integration_id);
 
     return { ok: true };
+  });
+
+
+async function getConnectedQboIntegration(clientId: string, integrationId: string) {
+  const { data: connection, error } = await adminDb
+    .from("client_integrations")
+    .select("id,client_id,external_account_id,status,provider,environment")
+    .eq("id", integrationId)
+    .eq("client_id", clientId)
+    .eq("provider", "quickbooks_online")
+    .eq("environment", "sandbox")
+    .maybeSingle();
+
+  if (error || !connection || connection.status !== "connected") {
+    throw new Error("A connected QuickBooks sandbox company is required for this test.");
+  }
+
+  if (
+    typeof connection.external_account_id !== "string" ||
+    !/^\d{1,30}$/.test(connection.external_account_id)
+  ) {
+    throw new Error("The connected QuickBooks company ID is invalid.");
+  }
+
+  return connection as {
+    id: string;
+    client_id: string;
+    external_account_id: string;
+    status: string;
+    provider: string;
+    environment: string;
+  };
+}
+
+const paymentAmountSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{1,8}\.\d{2}$/, "Enter an amount with two decimal places, for example 1.00.")
+  .refine((value) => Number(value) > 0, "The amount must be greater than zero.");
+
+export const getQboCompanyInfo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({
+      client_id: z.string().uuid(),
+      integration_id: z.string().uuid(),
+    }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertIntegrationAccess(context.userId, data.client_id, "view");
+    const connection = await getConnectedQboIntegration(data.client_id, data.integration_id);
+    return requestQboCompanyInfo(connection.id, connection.external_account_id);
+  });
+
+export const getQboOpenIdUserInfo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({
+      client_id: z.string().uuid(),
+      integration_id: z.string().uuid(),
+    }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertIntegrationAccess(context.userId, data.client_id, "view");
+    const connection = await getConnectedQboIntegration(data.client_id, data.integration_id);
+    return requestQboOpenIdUserInfo(connection.id);
+  });
+
+export const createQboSandboxCharge = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({
+      client_id: z.string().uuid(),
+      integration_id: z.string().uuid(),
+      amount: paymentAmountSchema,
+      card_token: z.string().trim().min(1).max(512),
+      capture: z.boolean().default(false),
+    }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    // Payment charges are restricted to Director/Admin by the database permission check.
+    await assertIntegrationAccess(context.userId, data.client_id, "approve");
+    const connection = await getConnectedQboIntegration(data.client_id, data.integration_id);
+
+    return requestQboSandboxCharge({
+      integrationId: connection.id,
+      amount: data.amount,
+      cardToken: data.card_token,
+      capture: data.capture,
+    });
+  });
+
+export const captureQboSandboxCharge = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({
+      client_id: z.string().uuid(),
+      integration_id: z.string().uuid(),
+      charge_id: z.string().trim().min(1).max(64),
+      amount: paymentAmountSchema,
+    }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertIntegrationAccess(context.userId, data.client_id, "approve");
+    const connection = await getConnectedQboIntegration(data.client_id, data.integration_id);
+
+    return requestQboSandboxCapture({
+      integrationId: connection.id,
+      chargeId: data.charge_id,
+      amount: data.amount,
+    });
   });
