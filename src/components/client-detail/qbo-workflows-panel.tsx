@@ -139,7 +139,7 @@ export function QboWorkflowsPanel({ clientId, integrationId }: Props) {
       </div>}
       <div className="mt-4 space-y-2">
         {operations.length ? operations.map((op) => <div key={op.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3 text-sm">
-          <div className="min-w-0"><div className="font-medium">{op.operation_type.replaceAll("_", " ")} · {op.status}</div><div className="mt-1 break-all text-xs text-muted-foreground">Request {op.id}{op.external_record_id ? ` · QuickBooks ID ${op.external_record_id}` : ""}{op.rejected_reason ? ` · ${op.rejected_reason}` : ""}</div></div>
+          <div className="min-w-0"><div className="font-medium">{op.operation_type.replaceAll("_", " ")} · {op.status}</div><div className="mt-1 break-all text-xs text-muted-foreground">Request {op.id}{op.external_record_id ? ` · QuickBooks ID ${op.external_record_id}` : ""}{op.rejected_reason ? ` · ${op.rejected_reason}` : ""}</div><pre className="mt-2 max-w-xl overflow-auto rounded bg-muted p-2 text-xs">{JSON.stringify(op.request_payload, null, 2)}</pre></div>
           <div className="flex flex-wrap gap-2">
             {canApprove && op.status === "pending_approval" && <><Button size="sm" disabled={busy} onClick={() => void decide(op.id, "approve")}>Approve</Button><Button size="sm" variant="outline" disabled={busy} onClick={() => void decide(op.id, "reject")}>Reject</Button></>}
             {canApprove && op.status === "approved" && <Button size="sm" disabled={busy} onClick={() => void execute(op.id)}>Execute</Button>}
