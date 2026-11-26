@@ -12,26 +12,26 @@ This branch implements the QuickBooks Online OAuth 2.0 connection for **developm
 
 Use the stable Vercel preview alias for this branch:
 
-\`https://gk-nahashon-git-integrations-foundation-hermanngugis-projects.vercel.app/api/integrations/qbo/callback\`
+`https://gk-nahashon-git-integrations-foundation-hermanngugis-projects.vercel.app/api/integrations/qbo/callback`
 
 The redirect URI must match exactly, including HTTPS, path and letter casing. Do not add query parameters or a trailing slash.
 
 ## 2. Configure Vercel Preview environment variables
 
-In the Vercel project \`gk-nahashon\`, add these variables for the **Preview** environment:
+In the Vercel project `gk-nahashon`, add these variables for the **Preview** environment:
 
 | Variable | Value |
 |---|---|
-| \`QBO_ENVIRONMENT\` | \`sandbox\` |
-| \`QBO_CLIENT_ID\` | Intuit Development Client ID |
-| \`QBO_CLIENT_SECRET\` | Intuit Development Client Secret |
-| \`QBO_REDIRECT_URI\` | The exact callback URL above |
+| `QBO_ENVIRONMENT` | `sandbox` |
+| `QBO_CLIENT_ID` | Intuit Development Client ID |
+| `QBO_CLIENT_SECRET` | Intuit Development Client Secret |
+| `QBO_REDIRECT_URI` | The exact callback URL above |
 
-Do not add a \`VITE_\` prefix to any of these values. They must remain server-side secrets. Do not put them in GitHub, source code or browser storage.
+Do not add a `VITE_` prefix to any of these values. They must remain server-side secrets. Do not put them in GitHub, source code or browser storage.
 
-Redeploy the \`integrations-foundation\` Preview after setting the variables.
+Redeploy the `integrations-foundation` Preview after setting the variables.
 
-For local development, use the same variable names in a local-only \`supabase/functions/.env\` or the runtime's local environment as appropriate. Do not commit local secret files. Intuit requires an HTTPS redirect URI, so local testing must use a trusted HTTPS tunnel or the Vercel Preview URL.
+For local development, use the same variable names in a local-only `supabase/functions/.env` or the runtime's local environment as appropriate. Do not commit local secret files. Intuit requires an HTTPS redirect URI, so local testing must use a trusted HTTPS tunnel or the Vercel Preview URL.
 
 ## 3. Test the connection
 
@@ -46,7 +46,7 @@ The callback stores access and refresh tokens in Supabase Vault. The regular int
 ## 4. Current limitations
 
 - Only the Intuit Development app keys and QuickBooks sandbox environment are supported.
-- The scope is \`com.intuit.quickbooks.accounting\`.
+- The scope is `com.intuit.quickbooks.accounting`.
 - OAuth connection, token refresh, token revocation and disconnect are implemented.
 - Customer, invoice and payment synchronisation is not yet implemented.
 - No QuickBooks write operations are implemented.
@@ -54,8 +54,8 @@ The callback stores access and refresh tokens in Supabase Vault. The regular int
 
 ## 5. Troubleshooting
 
-- **Configuration incomplete:** Check all four \`QBO_*\` Preview environment variables and redeploy.
-- **Redirect URI mismatch / invalid_grant:** Compare Intuit's registered URI with \`QBO_REDIRECT_URI\` character-for-character.
+- **Configuration incomplete:** Check all four `QBO_*` Preview environment variables and redeploy.
+- **Redirect URI mismatch / invalid_grant:** Compare Intuit's registered URI with `QBO_REDIRECT_URI` character-for-character.
 - **State invalid or expired:** Start a new connection; OAuth state is single-use and expires after ten minutes.
 - **Company already linked:** The same QuickBooks realm cannot be connected to a second Njia Smart client until the existing connection is disconnected.
 - **Reconnect required:** Start the OAuth flow again. The app always saves the latest refresh token returned by Intuit.
