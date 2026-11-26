@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -49,7 +49,6 @@ export function useTaskWorkspace(taskId: string) {
   const nameOf = (id?: string | null) => (id ? staff.find(p => p.id === id)?.full_name ?? "Unknown" : "—");
   const isLead = isLeadOf(task, user?.id, isAdmin);
   const isSupervisor = isSupervisorOf(task, user?.id, isAdmin);
-  const hasSubtasks = subtasks.length > 0;
   const subtasksDone = subtasks.filter(s => s.done).length;
 
   // Who to tell when something happens on this task.
@@ -72,23 +71,10 @@ export function useTaskWorkspace(taskId: string) {
     load();
   }
 
-  async function setProgress(pct: number) {
-    const { error } = await supabase.from("tasks").update({ progress: pct }).eq("id", taskId);
-    if (error) toast.error(error.message); else load();
-  }
-
-  async function addSubtask(title: string, assignedTo: string, dueDate: string) {
+  async function addSubtask(title: string) {
     if (!title.trim() || !user) return false;
-    const { error } = await supabase.from("task_subtasks").insert({
-      task_id: taskId, title: title.trim(), assigned_to: assignedTo || null, due_date: dueDate || null, created_by: user.id,
-    });
+    const { error } = await supabase.from("task_subtasks").insert({ task_id: taskId, title: title.trim(), created_by: user.id });
     if (error) { toast.error(error.message); return false; }
-    if (assignedTo && assignedTo !== user.id) {
-      await notifyUser({
-        user_id: assignedTo, type: "task_subtask_assigned", title: "You were asked to help on a task",
-        body: `${task?.title ?? "Task"}: ${title.trim()}`, link: `/tasks?task=${taskId}`,
-      });
-    }
     load();
     return true;
   }
@@ -98,55 +84,41 @@ export function useTaskWorkspace(taskId: string) {
     if (error) toast.error(error.message); else load();
   }
 
-  async function reassignSubtask(s: any, assignedTo: string) {
-    const { error } = await supabase.from("task_subtasks").update({ assigned_to: assignedTo || null }).eq("id", s.id);
-    if (error) return toast.error(error.message);
-    if (assignedTo && assignedTo !== user?.id) {
-      await notifyUser({
-        user_id: assignedTo, type: "task_subtask_assigned", title: "You were asked to help on a task",
-        body: `${task?.title ?? "Task"}: ${s.title}`, link: `/tasks?task=${taskId}`,
-      });
-    }
-    load();
-  }
-
   async function removeSubtask(s: any) {
-    if (!confirm(`Remove subtask "${s.title}"?`)) return;
+    if (!confirm(`Remove "${s.title}"?`)) return;
     const { error } = await supabase.from("task_subtasks").delete().eq("id", s.id);
     if (error) toast.error(error.message); else load();
   }
 
-  async function postUpdate(kind: "note" | "feedback" | "report" | "guidance", body: string, opts: { action?: string; askGuidance?: boolean } = {}) {
-    if (!body.trim() || !user) return false;
+  // A comment, or a request for help to whoever gave the task. When the giver (or
+  // Director/Admin) replies to a request, the "Needs help" flag clears.
+  async function postComment(body: string, needHelp = false) {
+    const text = body.trim() || (needHelp ? "I need help with this task." : "");
+    if (!text || !user) return false;
+    const kind = needHelp ? "report" : task?.needs_guidance && isSupervisor ? "guidance" : "note";
     const { error } = await supabase.from("task_comments").insert({
-      task_id: taskId, author_id: user.id, body: body.trim(), kind,
-      action: kind === "guidance" ? opts.action || null : null,
-      ask_guidance: kind === "report" ? !!opts.askGuidance : false,
+      task_id: taskId, author_id: user.id, body: text, kind, ask_guidance: needHelp,
     });
     if (error) { toast.error(error.message); return false; }
-    const label = kind === "guidance" ? "New guidance on your task"
-      : kind === "report" ? (opts.askGuidance ? "Guidance requested on a task" : "Progress report on a task")
-      : kind === "feedback" ? "New feedback on a task" : "New note on a task";
-    notifyTeam(`task_${kind}`, label);
+    notifyTeam(`task_${kind}`, needHelp ? "Help needed on a task" : "New comment on a task");
     load();
     return true;
   }
 
   async function removeUpdate(id: string) {
-    if (!confirm("Delete this entry?")) return;
+    if (!confirm("Delete this comment?")) return;
     const { error } = await supabase.from("task_comments").delete().eq("id", id);
     if (error) toast.error(error.message); else load();
   }
 
-  async function uploadOutput(file: File, note: string, isFinal: boolean) {
+  async function uploadOutput(file: File) {
     if (!user) return false;
     setBusy(true);
     const path = `${taskId}/${Date.now()}-${safeFileName(file.name)}`;
     const { error: upErr } = await supabase.storage.from(OUTPUT_BUCKET).upload(path, file);
     if (upErr) { setBusy(false); toast.error(upErr.message); return false; }
     const { error } = await supabase.from("task_outputs").insert({
-      task_id: taskId, file_path: path, file_name: file.name, note: note.trim() || null,
-      is_final: isFinal, uploaded_by: user.id,
+      task_id: taskId, file_path: path, file_name: file.name, uploaded_by: user.id,
     });
     setBusy(false);
     if (error) {
@@ -154,14 +126,9 @@ export function useTaskWorkspace(taskId: string) {
       toast.error(error.message);
       return false;
     }
-    notifyTeam("task_output", isFinal ? "Final output added to a task" : "Output added to a task");
+    notifyTeam("task_output", "File added to a task");
     load();
     return true;
-  }
-
-  async function markFinal(o: any) {
-    const { error } = await supabase.from("task_outputs").update({ is_final: true }).eq("id", o.id);
-    if (error) toast.error(error.message); else load();
   }
 
   async function removeOutput(o: any) {
@@ -174,13 +141,11 @@ export function useTaskWorkspace(taskId: string) {
 
   const openOutput = (o: any) => openStoredFile(OUTPUT_BUCKET, o.file_path, 300);
 
-  const people = useMemo(() => staff, [staff]);
-
   return {
-    user, isAdmin, task, subtasks, updates, outputs, people, loading, missingSetup, busy,
-    isLead, isSupervisor, hasSubtasks, subtasksDone, nameOf,
-    setStatus, setProgress, addSubtask, toggleSubtask, reassignSubtask, removeSubtask,
-    postUpdate, removeUpdate, uploadOutput, markFinal, removeOutput, openOutput,
+    user, isAdmin, task, subtasks, updates, outputs, loading, missingSetup, busy,
+    isLead, isSupervisor, subtasksDone, nameOf,
+    setStatus, addSubtask, toggleSubtask, removeSubtask,
+    postComment, removeUpdate, uploadOutput, removeOutput, openOutput,
   };
 }
 

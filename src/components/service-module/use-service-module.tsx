@@ -216,23 +216,11 @@ export function useServiceModule({
     const clientName = milestoneEditor?.clients?.company_name;
     const link = `/${moduleKey.replace(/_/g, "-")}`;
 
-    // Give the assignee a task so it shows up on their dashboard / task list.
-    await supabase.from("tasks").insert({
-      title: `${title} — ${moduleLabel}`,
-      description: clientName ? `Step in ${moduleLabel} engagement for ${clientName}.` : `Step in ${moduleLabel} engagement.`,
-      client_id: milestoneEditor?.client_id ?? null,
-      assigned_to: assigneeId,
-      due_date: dueDate || null,
-      status: "todo",
-      priority: "normal",
-      created_by: user?.id ?? null,
-    });
-
     if (assigneeId === user?.id) return;
     await notifyUser({
       user_id: assigneeId, type: "milestone_assigned",
-      title: "Assigned to a task",
-      body: clientName ? `${title} — ${moduleLabel} (${clientName})` : `${title} — ${moduleLabel}`,
+      title: "Assigned to a milestone",
+      body: `${clientName ? `${title} — ${moduleLabel} (${clientName})` : `${title} — ${moduleLabel}`}${dueDate ? ` · due ${dueDate}` : ""}`,
       link,
     });
   }

@@ -81,17 +81,6 @@ export function ClientAssignments({ clientId, compact = false }: { clientId: str
     const { data: client } = await supabase.from("clients").select("company_name").eq("id", clientId).maybeSingle();
     const clientName = client?.company_name;
 
-    // Give the assignee a task so it shows up on their dashboard / task list.
-    await supabase.from("tasks").insert({
-      title: clientName ? `New client assignment: ${clientName}` : "New client assignment",
-      description: role ? `Added as ${role} on this client's engagement team.` : "Added to this client's engagement team.",
-      client_id: clientId,
-      assigned_to: userId,
-      status: "todo",
-      priority: "normal",
-      created_by: user?.id ?? null,
-    });
-
     if (userId !== user?.id) {
       await notifyUser({
         user_id: userId, type: "client_assigned",
