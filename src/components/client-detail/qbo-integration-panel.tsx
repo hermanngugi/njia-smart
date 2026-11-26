@@ -28,8 +28,9 @@ type QboConnection = {
 
 export function QboIntegrationPanel({ clientId }: { clientId: string }) {
   const { isAdmin, roles } = useAuth();
-  const canConnect = isAdmin || roles.includes("accountant");
-  const canCreateSandboxCharge = isAdmin || roles.includes("director");
+  const canAdminister = isAdmin || roles.includes("director");
+  const canConnect = canAdminister || roles.includes("accountant");
+  const canCreateSandboxCharge = canAdminister;
   const [connection, setConnection] = useState<QboConnection | null>(null);
   const [allowed, setAllowed] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -226,7 +227,7 @@ export function QboIntegrationPanel({ clientId }: { clientId: string }) {
             </div>
             <div className="min-w-0">
               <h3 className="font-semibold">QuickBooks Online</h3>
-              <p className="text-sm text-muted-foreground">Accounting connection · Development sandbox</p>
+              <p className="text-sm text-muted-foreground">Accounting + Payments + OpenID · Development sandbox</p>
             </div>
           </div>
           <span className={statusClasses}>
@@ -264,7 +265,7 @@ export function QboIntegrationPanel({ clientId }: { clientId: string }) {
 
         {connected && (
           <p className="mt-3 text-xs text-muted-foreground">
-            OAuth is connected. Accounting data retrieval has not been enabled yet; the first synchronisation phase will be read-only.
+            OAuth and sandbox API access are connected. CompanyInfo and OpenID test calls are available below; bulk accounting synchronisation is not enabled yet.
           </p>
         )}
 
@@ -286,7 +287,7 @@ export function QboIntegrationPanel({ clientId }: { clientId: string }) {
               <RefreshCw className="mr-2 h-4 w-4" /> Try again
             </Button>
           )}
-          {isAdmin && connected && (
+          {canAdminister && connected && (
             <Button variant="outline" onClick={disconnect} disabled={busy !== null}>
               {busy === "disconnect" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Unplug className="mr-2 h-4 w-4" />}
               Disconnect
