@@ -3,6 +3,7 @@ import { AlertCircle, CheckCircle2, CreditCard, ExternalLink, Loader2, RefreshCw
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
+import { QboWorkflowsPanel } from "@/components/client-detail/qbo-workflows-panel";
 import {
   captureQboSandboxCharge,
   createQboSandboxCharge,
@@ -265,7 +266,7 @@ export function QboIntegrationPanel({ clientId }: { clientId: string }) {
 
         {connected && (
           <p className="mt-3 text-xs text-muted-foreground">
-            OAuth and sandbox API access are connected. CompanyInfo and OpenID test calls are available below; bulk accounting synchronisation is not enabled yet.
+            OAuth and sandbox API access are connected. Read-only data synchronisation and approval-gated accounting operations are available below.
           </p>
         )}
 
@@ -398,6 +399,7 @@ export function QboIntegrationPanel({ clientId }: { clientId: string }) {
           </p>
         )}
       </div>
+      {connected && connection && <QboWorkflowsPanel clientId={clientId} integrationId={connection.id} />}
     </div>
   );
 }
