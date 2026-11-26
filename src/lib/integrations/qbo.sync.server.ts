@@ -93,7 +93,8 @@ function allowList(type: QboRecordType, raw: JsonObject) {
 }
 
 function queryFor(type: QboRecordType, since: string | null, start: number) {
-  const updatedFilter = since ? ` WHERE MetaData.LastUpdatedTime > '${since.replace(/'/g, "")}'` : "";
+  const overlap = since ? new Date(new Date(since).getTime() - 5000).toISOString() : null;
+  const updatedFilter = overlap ? ` WHERE MetaData.LastUpdatedTime > '${overlap}'` : "";
   return `select * from ${type}${updatedFilter} ORDERBY MetaData.LastUpdatedTime STARTPOSITION ${start} MAXRESULTS 1000`;
 }
 
