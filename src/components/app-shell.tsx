@@ -143,7 +143,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     openGroups[g.label] ?? g.children.some((c) => isActivePath(pathname, c.to));
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="app-shell min-h-screen w-full min-w-0 bg-background">
       {/* Sidebar — always position: fixed to the viewport, at every breakpoint.
           It is intentionally taken out of the document flow entirely so no
           page's content height, scroll container, or layout can drag it
@@ -152,7 +152,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <aside
         onMouseEnter={onSidebarEnter}
         onMouseLeave={onSidebarLeave}
-        className={`fixed inset-y-0 left-0 z-40 h-screen w-64 bg-sidebar text-sidebar-foreground flex flex-col overflow-hidden shadow-xl transition-[transform,width] duration-300 ease-in-out lg:translate-x-0 ${
+        id="primary-sidebar"\n        className={`app-sidebar fixed inset-y-0 left-0 z-40 h-screen w-[min(18rem,calc(100vw-1rem))] bg-sidebar text-sidebar-foreground flex flex-col overflow-hidden shadow-xl transition-[transform,width] duration-300 ease-in-out lg:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         } ${expanded ? "lg:w-64" : "lg:w-16"} ${expanded && !pinned ? "" : "lg:shadow-none"}`}
       >
@@ -174,7 +174,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className={`hidden text-center text-base font-bold tracking-tight ${expanded ? "" : "lg:block"}`}>GK</div>
         </div>
-        <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto overflow-x-hidden">
+        <nav className="flex-1 min-h-0 px-2 py-3 space-y-0.5 overflow-y-auto overflow-x-hidden overscroll-y-contain">
           {items.map((item) => {
             if (isGroup(item)) {
               const Icon = item.icon;
@@ -282,18 +282,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Main — offset by the sidebar's width on desktop; the sidebar is
           fixed, not a flex sibling, so nothing here can pull it along. */}
-      <div className={`flex flex-col min-h-screen transition-[margin-left] duration-300 ease-in-out ${pinned ? "lg:ml-64" : "lg:ml-16"}`}>
-        <header className="h-14 border-b bg-card flex items-center px-4 gap-3 sticky top-0 z-20">
+      <div className={`app-main-column flex min-h-screen min-w-0 w-full flex-col transition-[margin-left] duration-300 ease-in-out ${pinned ? "lg:ml-64" : "lg:ml-16"}`}>
+        <header className="app-topbar h-14 min-w-0 border-b bg-card flex items-center px-2 sm:px-4 gap-2 sm:gap-3 sticky top-0 z-20">
           <button
             className={`p-2 -ml-2 rounded-md hover:bg-muted ${pinned ? "lg:hidden" : ""}`}
             onClick={() => setOpen(true)}
           >
             <Menu className="h-5 w-5" />
           </button>
-          <h1 className="text-sm font-semibold capitalize min-w-0 truncate">
+          <h1 className="min-w-0 flex-1 text-sm font-semibold capitalize truncate">
             {pathname.split("/").filter(Boolean)[0] || "Dashboard"}
           </h1>
-          <div className="ml-auto flex items-center gap-0.5 sm:gap-2 shrink-0">
+          <div className="app-topbar-actions ml-auto flex items-center gap-0 sm:gap-1.5 shrink-0">
             <CommandPalette pages={items.flatMap((i) => (isGroup(i) ? i.children : [i]))} />
             <ThemeToggle />
             <OfflineIndicator paths={items.flatMap((i) => (isGroup(i) ? i.children : [i]).map((l) => l.to))} />
@@ -301,7 +301,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <NotificationBell />
           </div>
         </header>
-        <main className="flex-1 p-4 md:p-6 overflow-x-hidden">
+        <main className="app-main-content min-w-0 flex-1 p-3 sm:p-4 md:p-6 overflow-x-hidden">
           <PageTransition>{children}</PageTransition>
         </main>
       </div>
