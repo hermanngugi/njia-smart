@@ -36,6 +36,7 @@ export type ModuleKey =
   | "ict_service_desk"
   | "tasks"
   | "accounts"
+  | "integrations"
   | "documents"
   | "calendar"
   | "announcements"
@@ -53,7 +54,7 @@ const RANK: Record<AccessLevel, number> = { none: 0, assigned: 1, view: 2, full:
 const ALL_MODULES: ModuleKey[] = [
   "dashboard", "clients", "audit", "tax", "advisory",
   "outsourced_accounting", "payroll_management", "financial_business_management",
-  "ict", "ict_service_desk", "tasks", "accounts", "documents", "calendar", "announcements",
+  "ict", "ict_service_desk", "tasks", "accounts", "integrations", "documents", "calendar", "announcements",
   "hr", "team", "activity", "settings", "notifications", "chat",
 ];
 
@@ -140,6 +141,14 @@ export const ROLE_ACCESS: Record<AppRole, Record<ModuleKey, AccessLevel>> = {
     ["hr"]
   ),
 };
+
+// Integration access is limited to clients the user is assigned to.
+// The database enforces action-level distinctions: Accountants can connect
+// and synchronise; Audit Managers and Tax Consultants are view-only.
+// Directors/Admins receive full access through ALL_MODULES above.
+for (const role of ["accountant", "audit_manager", "tax_consultant"] as AppRole[]) {
+  ROLE_ACCESS[role].integrations = "assigned";
+}
 
 // Dashboard is a landing surface, not a data module — always visible to any
 // authenticated staff member.
