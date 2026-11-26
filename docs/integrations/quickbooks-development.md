@@ -31,7 +31,7 @@ Do not add a `VITE_` prefix to any of these values. They must remain server-side
 
 Redeploy the `integrations-foundation` Preview after setting the variables.
 
-For local development, use the same variable names in a local-only `supabase/functions/.env` or the runtime's local environment as appropriate. Do not commit local secret files. Intuit requires an HTTPS redirect URI, so local testing must use a trusted HTTPS tunnel or the Vercel Preview URL.
+For local development, put the same variables in the repository-root `.env.local` file (this filename is ignored by Git) or supply them to the local Node.js process. Do not commit local secret files. Set `QBO_REDIRECT_URI` to the exact HTTPS callback URL registered in Intuit. Local OAuth testing therefore needs a trusted HTTPS tunnel whose callback is also registered with Intuit, or you can use the Vercel Preview URL.
 
 ## 3. Test the connection
 
