@@ -3,7 +3,15 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 const AUTHORIZATION_ENDPOINT = "https://appcenter.intuit.com/connect/oauth2";
 const TOKEN_ENDPOINT = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer";
 const REVOCATION_ENDPOINT = "https://developer.api.intuit.com/v2/oauth2/tokens/revoke";
-export const QBO_ACCOUNTING_SCOPE = "com.intuit.quickbooks.accounting";
+export const QBO_REQUESTED_SCOPES = [
+  "com.intuit.quickbooks.accounting",
+  "com.intuit.quickbooks.payment",
+  "openid",
+  "profile",
+  "email",
+  "phone",
+  "address",
+] as const;
 
 export type QboConfig = {
   clientId: string;
@@ -99,7 +107,7 @@ export function buildQboAuthorizationUrl(config: QboConfig, state: string): stri
   url.searchParams.set("client_id", config.clientId);
   url.searchParams.set("redirect_uri", config.redirectUri);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", QBO_ACCOUNTING_SCOPE);
+  url.searchParams.set("scope", QBO_REQUESTED_SCOPES.join(" "));
   url.searchParams.set("state", state);
   return url.toString();
 }
@@ -261,7 +269,7 @@ async function markQboReconnectRequired(integrationId: string, code: string) {
  * Intuit rotates refresh tokens. A database lock ensures only one invocation
  * can exchange a refresh token at a time.
  */
-export async function getFreshQboAccessToken(integrationId: string): Promise<string> {
+export async function getFreshQboAccessToken(integrationId: string, forceRefresh = false): Promise<string> {
   const config = getQboConfig();
   const connectionResult = await adminDb
     .from("client_integrations")
@@ -280,7 +288,7 @@ export async function getFreshQboAccessToken(integrationId: string): Promise<str
 
   let credentials = await readQboCredentials(integrationId);
   const accessExpiry = new Date(connectionResult.data.access_token_expires_at ?? 0).getTime();
-  if (Number.isFinite(accessExpiry) && accessExpiry > Date.now() + 120_000) {
+  if (!forceRefresh && Number.isFinite(accessExpiry) && accessExpiry > Date.now() + 120_000) {
     return credentials.access_token;
   }
 
