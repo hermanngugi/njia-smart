@@ -126,7 +126,7 @@ export function CommandPalette({ pages }: { pages: PaletteLink[] }) {
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="overflow-hidden p-0 max-w-xl top-[20%] translate-y-0">
+        <DialogContent className="mobile-search-dialog overflow-hidden p-0 max-w-xl top-[20%] translate-y-0">
           <DialogTitle className="sr-only">Search</DialogTitle>
           <Command shouldFilter={false} className="[&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-2.5 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]]:px-2">
             <CommandInput value={query} onValueChange={setQuery} placeholder="Search pages, clients (company or individual), invoices, audits, team…" />
