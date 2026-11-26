@@ -57,3 +57,9 @@ Before enabling data actions:
 - Production Intuit credentials or live payment processing.
 - KRA eTIMS, Xero or Sage provider connectors.
 - M-PESA, WhatsApp, Google Workspace or Microsoft 365.
+## Official Intuit references
+
+- [QuickBooks Online query syntax, pagination and MetaData.LastUpdatedTime filters](https://static.developer.intuit.com/output_html/qbo/docs/learn/explore-the-quickbooks-online-api/data-queries.html)
+- [QuickBooks Invoice create API](https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/invoice)
+- [QuickBooks Payment create API](https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/payment)
+- [QuickBooks request IDs and idempotency](https://static.developer.intuit.com/output_html/qbo/docs/learn/learn-basic-field-definitions.html)
