@@ -327,6 +327,10 @@ export async function getFreshQboAccessToken(integrationId: string): Promise<str
     }
 
     credentials = await readQboCredentials(integrationId);
+    if (credentials.hard_expiry_at && new Date(credentials.hard_expiry_at).getTime() <= refreshedAt) {
+      await markQboReconnectRequired(integrationId, "refresh_token_hard_expired");
+      throw new QboOAuthError("refresh_token_hard_expired", "Reconnect the QuickBooks company.");
+    }
     const tokens = await refreshQboToken(config, credentials.refresh_token);
     const expiries = tokenExpiryDates(tokens, refreshedAt);
     const merged: QboCredentialBundle = {
