@@ -21,21 +21,21 @@ The app requests only the QuickBooks Accounting scope:
 
 Payment and OpenID scopes are not required for invoice creation or invoice-status reads.
 
-Register this exact callback in Intuit and configure the same URL as `QBO_REDIRECT_URI` in Vercel:
+Register the Preview callback below in the Intuit Development app and configure the same URL only in the Vercel Preview variables for branch `qbo-simplified-invoice-sync`:
 
-`https://gk-nahashon.vercel.app/api/integrations/qbo/callback`
+`https://gk-nahashon-git-qbo-simplified-inv-2c23f2-hermanngugis-projects.vercel.app/api/integrations/qbo/callback`
 
-Confirm the deployed callback URL and Intuit developer-app setting match exactly before testing OAuth. Do not add a trailing slash, query string or different path.
+The eventual Production callback is `https://gk-nahashon.vercel.app/api/integrations/qbo/callback`; do not change or reuse Production environment values while testing this branch. Intuit may have both redirect URLs registered. Confirm each deployed callback exactly matches its own Vercel environment value. Do not add a trailing slash, query string or different path.
 
 ## Environment variables
 
-Configure these as server-side Vercel Preview variables and in the ignored local `.env.local` for local development:
+Configure these as server-side Vercel Preview variables, restricted to branch `qbo-simplified-invoice-sync`, and in the ignored local `.env.local` for local development. Keep the existing Production variables unchanged:
 
 ```dotenv
 QBO_ENVIRONMENT=sandbox
 QBO_CLIENT_ID=your_Intuit_Development_Client_ID
 QBO_CLIENT_SECRET=your_Intuit_Development_Client_Secret
-QBO_REDIRECT_URI=https://gk-nahashon.vercel.app/api/integrations/qbo/callback
+QBO_REDIRECT_URI=https://gk-nahashon-git-qbo-simplified-inv-2c23f2-hermanngugis-projects.vercel.app/api/integrations/qbo/callback
 ```
 
 Never commit the client secret, place it in a `VITE_*` variable, or expose it to browser code. The server reads and rotates OAuth credentials through the existing Supabase Vault functions.
