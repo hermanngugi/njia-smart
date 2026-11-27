@@ -65,12 +65,12 @@ export async function saveQboInvoiceSetup(connection: Connection, clientId: stri
   const item = safeId(serviceItemId);
   const [customerResult, itemResult] = await Promise.all([
     request<Json>(connection, queryPath(`select Id, DisplayName from Customer where Id = '${customer}'`)),
-    request<Json>(connection, queryPath(`select Id, Name, Type from Item where Id = '${item}'`)),
+    request<Json>(connection, queryPath(`select Id, Name, Type, Active from Item where Id = '${item}'`)),
   ]);
   const qboCustomer = customerResult.QueryResponse?.Customer?.[0];
   const qboItem = itemResult.QueryResponse?.Item?.[0];
   if (!qboCustomer) throw new QboInvoiceError("customer_not_found", "The selected QuickBooks customer was not found.");
-  if (!qboItem || qboItem.Type !== "Service") throw new QboInvoiceError("service_item_invalid", "Select an active QuickBooks Service item.");
+  if (!qboItem || qboItem.Type !== "Service" || qboItem.Active === false) throw new QboInvoiceError("service_item_invalid", "Select an active QuickBooks Service item.");
 
   const { error: mapError } = await db.from("integration_record_mappings").upsert({
     integration_id: connection.id, client_id: clientId,
