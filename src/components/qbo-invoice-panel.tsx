@@ -14,7 +14,7 @@ type Setup = {
   serviceItems: Array<{ id: string; name: string; description: string | null }>;
   customerId: string | null;
   serviceItemId: string | null;
-  invoiceLink: { externalId: string; document_number?: string; status?: string; total_amount?: number; amount_paid?: number; balance_amount?: number; syncedAt?: string } | null;
+  invoiceLink: { externalId: string; document_number?: string; status?: string; total_amount?: number; amount_paid?: number; balance_amount?: number; currency_code?: string; syncedAt?: string } | null;
 };
 type SyncResult = {
   externalId: string;
@@ -23,11 +23,13 @@ type SyncResult = {
   total: number;
   amountPaid: number;
   balance: number;
+  currencyCode: string;
   syncedAt: string;
 };
 
-function money(value: number) {
-  return new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES" }).format(value || 0);
+function money(value: number, currencyCode = "KES") {
+  try { return new Intl.NumberFormat("en-KE", { style: "currency", currency: currencyCode }).format(value || 0); }
+  catch { return `${currencyCode} ${(value || 0).toLocaleString("en-KE", { minimumFractionDigits: 2 })}`; }
 }
 
 export function QboInvoicePanel({ clientId, invoiceId, invoiceStatus }: {
@@ -53,7 +55,7 @@ export function QboInvoicePanel({ clientId, invoiceId, invoiceStatus }: {
       setSetup(result);
       setCustomerId(result.customerId ?? "");
       setServiceItemId(result.serviceItemId ?? "");
-      setSync(result.invoiceLink ? { externalId: result.invoiceLink.externalId, documentNumber: result.invoiceLink.document_number ?? null, status: result.invoiceLink.status ?? "sent", total: Number(result.invoiceLink.total_amount ?? 0), amountPaid: Number(result.invoiceLink.amount_paid ?? 0), balance: Number(result.invoiceLink.balance_amount ?? 0), syncedAt: result.invoiceLink.syncedAt ?? new Date().toISOString() } : null);
+      setSync(result.invoiceLink ? { externalId: result.invoiceLink.externalId, documentNumber: result.invoiceLink.document_number ?? null, status: result.invoiceLink.status ?? "sent", total: Number(result.invoiceLink.total_amount ?? 0), amountPaid: Number(result.invoiceLink.amount_paid ?? 0), balance: Number(result.invoiceLink.balance_amount ?? 0), currencyCode: result.invoiceLink.currency_code ?? "KES", syncedAt: result.invoiceLink.syncedAt ?? new Date().toISOString() } : null);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not load QuickBooks invoice settings.");
     } finally { setBusy(null); }
@@ -149,8 +151,8 @@ export function QboInvoicePanel({ clientId, invoiceId, invoiceStatus }: {
         <div className="grid gap-2 rounded-md bg-muted/40 p-3 text-sm sm:grid-cols-4">
           <div><div className="text-xs text-muted-foreground">QuickBooks invoice</div><div className="font-medium">{sync.documentNumber || sync.externalId}</div></div>
           <div><div className="text-xs text-muted-foreground">Status</div><div className="font-medium capitalize">{sync.status}</div></div>
-          <div><div className="text-xs text-muted-foreground">Amount paid</div><div className="font-medium">{money(sync.amountPaid)}</div></div>
-          <div><div className="text-xs text-muted-foreground">Outstanding</div><div className="font-medium">{money(sync.balance)}</div></div>
+          <div><div className="text-xs text-muted-foreground">Amount paid</div><div className="font-medium">{money(sync.amountPaid, sync.currencyCode)}</div></div>
+          <div><div className="text-xs text-muted-foreground">Outstanding</div><div className="font-medium">{money(sync.balance, sync.currencyCode)}</div></div>
           <div className="sm:col-span-4 text-xs text-muted-foreground">Last synced: {new Date(sync.syncedAt).toLocaleString()}</div>
           <div className="sm:col-span-4"><a className="text-sm text-primary underline" href={`https://app.sandbox.qbo.intuit.com/app/invoice?txnId=${encodeURIComponent(sync.externalId)}`} target="_blank" rel="noreferrer">Open invoice in QuickBooks</a></div>
         </div>
