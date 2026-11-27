@@ -49,11 +49,11 @@ export function QboInvoicePanel({ clientId, invoiceId, invoiceStatus }: {
         setIntegrationId(null); setSetup(null); setSync(null); return;
       }
       setIntegrationId(connection.id);
-      const result = await getQboInvoiceSetup({ data: { client_id: clientId, integration_id: connection.id } }) as Setup;
+      const result = await getQboInvoiceSetup({ data: { client_id: clientId, integration_id: connection.id, invoice_id: invoiceId } }) as Setup;
       setSetup(result);
       setCustomerId(result.customerId ?? "");
       setServiceItemId(result.serviceItemId ?? "");
-      if (result.invoiceLink) setSync({ externalId: result.invoiceLink.externalId, documentNumber: result.invoiceLink.document_number ?? null, status: result.invoiceLink.status ?? "sent", total: Number(result.invoiceLink.total_amount ?? 0), amountPaid: Number(result.invoiceLink.amount_paid ?? 0), balance: Number(result.invoiceLink.balance_amount ?? 0), syncedAt: result.invoiceLink.syncedAt ?? new Date().toISOString() });
+      setSync(result.invoiceLink ? { externalId: result.invoiceLink.externalId, documentNumber: result.invoiceLink.document_number ?? null, status: result.invoiceLink.status ?? "sent", total: Number(result.invoiceLink.total_amount ?? 0), amountPaid: Number(result.invoiceLink.amount_paid ?? 0), balance: Number(result.invoiceLink.balance_amount ?? 0), syncedAt: result.invoiceLink.syncedAt ?? new Date().toISOString() } : null);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not load QuickBooks invoice settings.");
     } finally { setBusy(null); }
@@ -104,7 +104,7 @@ export function QboInvoicePanel({ clientId, invoiceId, invoiceStatus }: {
     </section>
   );
 
-  const linked = Boolean(sync?.externalId);
+  const linked = Boolean(sync?.externalId);\n  const mappingReady = Boolean(setup?.customerId && setup?.serviceItemId && customerId === setup.customerId && serviceItemId === setup.serviceItemId);
   return (
     <section className="space-y-3 rounded-lg border bg-card p-4 print:hidden">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -136,7 +136,7 @@ export function QboInvoicePanel({ clientId, invoiceId, invoiceStatus }: {
           {busy === "save" ? "Saving…" : "Save client mapping"}
         </Button>
         {!linked && (
-          <Button type="button" onClick={send} disabled={busy !== null || invoiceStatus === "draft" || !setup?.customerId || !setup?.serviceItemId}>
+          <Button type="button" onClick={send} disabled={busy !== null || invoiceStatus === "draft" || !mappingReady}>
             {busy === "send" ? "Sending…" : "Send invoice to QuickBooks"}
           </Button>
         )}
