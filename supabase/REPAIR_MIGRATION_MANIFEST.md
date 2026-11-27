@@ -75,3 +75,11 @@ Supabase Security Advisor still reports:
 ## Important operational note
 
 The repository's `supabase/config.toml` now points to the live project reference above. Future migrations should be created with the Supabase CLI, reviewed against this manifest and the live migration ledger, then applied once. Do not manually replay the archived SQL.
+
+## Tax simplification (2026-11-26)
+
+| Live version | Migration | Scope |
+|---|---|---|
+| `20261126090854` | `20260928100000_record_timestamps_and_tax_assignment` | Accidental re-run of an already-applied migration; it put an older `tg_tax_return_filed` over the current one (the other functions it touches were unchanged) |
+| `20261126091036` | `restore_tg_tax_return_filed_from_period_controls` | Restores `tg_tax_return_filed` exactly as defined by `20261125234500_tax_filing_invoice_period_controls` |
+| `20261126092039` | `20261126100000_tax_simplified_checklist` | 4-step filing checklist stamped with who/when, closing requires prepared + receipt + invoice, one owner per filing, deadline reminders (7/3/1/0 days), overdue alerts and a daily admin digest |
