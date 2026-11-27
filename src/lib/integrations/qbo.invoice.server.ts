@@ -40,7 +40,7 @@ function asNumber(value: unknown) { const n = Number(value); return Number.isFin
 
 export async function listQboInvoiceSetup(connection: Connection, clientId: string, invoiceId?: string) {
   const [customers, items, mapping, invoiceMapping] = await Promise.all([
-    request<Json>(connection, queryPath("select Id, DisplayName, CompanyName, PrimaryEmailAddr from Customer where Active = true MAXRESULTS 1000")),
+    request<Json>(connection, queryPath("select * from Customer where Active = true MAXRESULTS 1000")),
     request<Json>(connection, queryPath("select Id, Name, Description, Type, Active from Item where Type = 'Service' and Active = true MAXRESULTS 1000")),
     db.from("integration_record_mappings").select("external_record_id,metadata")
       .eq("integration_id", connection.id).eq("client_id", clientId)
@@ -189,9 +189,10 @@ export async function sendNjiaInvoiceToQbo(connection: Connection, clientId: str
   if (!customer) throw new QboInvoiceError("customer_not_found", "The mapped QuickBooks Customer no longer exists.");
   const preferencesResponse = await request<Json>(connection, "preferences");
   const preferences = preferencesResponse.Preferences ?? {};
-  const homeCurrency = asText(preferences.CurrencyPrefs?.HomeCurrency?.value, 3);
-  const multiCurrency = preferences.CurrencyPrefs?.MultiCurrencyEnabled === true;
+  const homeCurrency = asText(preferences.CurrencyPrefs?.HomeCurrency?.value ?? preferences.HomeCurrency?.value, 3);
+  const multiCurrency = preferences.CurrencyPrefs?.MultiCurrencyEnabled === true || preferences.MultiCurrencyEnabled === true;
   const customerCurrency = asText(customer.CurrencyRef?.value, 3) ?? homeCurrency;
+  if (multiCurrency && !customerCurrency) throw new QboInvoiceError("currency_unavailable", "QuickBooks customer currency could not be confirmed.");
   if (invoice.currency && customerCurrency && invoice.currency !== customerCurrency) {
     throw new QboInvoiceError("currency_mismatch", `This QuickBooks Customer uses ${customerCurrency}; the Njia Smart invoice is ${invoice.currency}. Match a customer configured for the same currency.`);
   }
@@ -217,9 +218,10 @@ export async function sendNjiaInvoiceToQbo(connection: Connection, clientId: str
   };
   if (multiCurrency && invoice.currency) payload.CurrencyRef = { value: invoice.currency };
   const companyInfo = await request<Json>(connection, `companyinfo/${encodeURIComponent(connection.external_account_id)}`);
-  const companyCountry = asText(companyInfo.CompanyInfo?.Country, 80)?.toUpperCase();
-  if (companyCountry && companyCountry !== "US") payload.GlobalTaxCalculation = "TaxExcluded";
-  const requestId = invoice.id.replace(/-/g, "").slice(0, 36);
+  const companyCountry = asText(companyInfo.CompanyInfo?.Country, 80)?.trim().toUpperCase();
+  if (!companyCountry) throw new QboInvoiceError("company_country_unknown", "QuickBooks company country could not be determined; the invoice was not sent.");
+  if (!["US", "USA", "UNITED STATES", "UNITED STATES OF AMERICA"].includes(companyCountry)) payload.GlobalTaxCalculation = "TaxExcluded";
+  const requestId = invoice.id;
   const result = await request<Json>(connection, `invoice?requestid=${requestId}`, {
     method: "POST", body: JSON.stringify(payload),
   });
