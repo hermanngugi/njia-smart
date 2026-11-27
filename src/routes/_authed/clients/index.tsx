@@ -320,7 +320,7 @@ function ClientsList() {
 
       <div className="bg-card border rounded-lg overflow-hidden flex-1 min-h-0 flex flex-col">
         <div className="client-list-scroll overflow-auto flex-1 min-h-0">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[52rem] text-sm">
             <thead className="text-left text-xs text-muted-foreground border-b bg-muted sticky top-0 z-10">
               <tr>
                 <th className="py-2 px-3 w-8"><input type="checkbox" checked={filtered.length > 0 && selected.size === filtered.length} onChange={toggleSelectAll} /></th>

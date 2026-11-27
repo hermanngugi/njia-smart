@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Upload, Download, Trash2, FileText, Eye, X, Search, ShieldCheck } from "lucide-react";
+import { Upload, Download, Trash2, FileText, X, Search } from "lucide-react";
 import { formatDate } from "@/lib/format";
 import { useLiveRefresh } from "@/hooks/use-live-refresh";
 import { isOnline } from "@/lib/offline/status";
@@ -45,6 +45,8 @@ function DocsPage() {
   const [confidentiality, setConfidentiality] = useState("confidential");
   const [title, setTitle] = useState("");
   const [busy, setBusy] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [adding, setAdding] = useState(false);
   const [preview, setPreview] = useState<{ url: string; title: string } | null>(null);
   const [search, setSearch] = useState("");
   const [filterClient, setFilterClient] = useState("");
@@ -100,12 +102,14 @@ function DocsPage() {
     return true;
   }
 
-  async function upload(event: React.ChangeEvent<HTMLInputElement>) {
-    const input = event.currentTarget;
-    const file = input.files?.[0];
-    if (!file) return;
-    if (busy) { input.value = ""; return; }
-    if (!requireOnline("Document uploads")) { input.value = ""; return; }
+  function closeUpload() {
+    setAdding(false); setFile(null); setTitle(""); setCategory(""); setClientId(""); setConfidentiality("confidential");
+  }
+
+  async function upload(event: React.FormEvent) {
+    event.preventDefault();
+    if (!file || busy) return;
+    if (!requireOnline("Document uploads")) return;
 
     setBusy(true);
     let path: string | null = null;
@@ -176,16 +180,12 @@ function DocsPage() {
         toast.success(clientId ? "Document uploaded and linked to the client." : "Internal document uploaded successfully.");
       }
 
-      setTitle("");
-      setCategory("");
-      setClientId("");
-      setConfidentiality("confidential");
+      closeUpload();
       await load();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Document upload failed. Check your connection and try again.");
     } finally {
       setBusy(false);
-      input.value = "";
     }
   }
 
@@ -243,131 +243,78 @@ function DocsPage() {
     return !search.trim() || haystack.includes(search.trim().toLowerCase());
   });
 
-  const internalCount = rows.filter((row) => row.clientId === null).length;
+  const typeLabel = (row: LibraryDocument) => TYPE_LABELS[row.category] || row.category.replaceAll("_", " ");
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Documents</h1>
-          <p className="text-sm text-muted-foreground">A simple shared library for client files and internal GK documents.</p>
-        </div>
-        <div className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-xs text-muted-foreground">
-          <ShieldCheck className="h-4 w-4 text-primary" />
-          Private files · access controlled by your Documents permissions
-        </div>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold">Documents</h1>
+        <button type="button" onClick={() => setAdding(true)} className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm text-primary-foreground">
+          <Upload className="h-4 w-4" /> Upload
+        </button>
       </div>
 
-      <section className="rounded-lg border bg-card p-4 space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="font-semibold">Upload a document</h2>
-          <span className="text-xs text-muted-foreground">Client is optional</span>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="relative min-w-0 flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by name, client or type…" className={inputClass + " pl-9"} />
         </div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <select value={clientId} onChange={(event) => setClientId(event.target.value)} className={inputClass}>
-            <option value="">Internal / no client</option>
-            {clients.map((client) => (
-              <option key={client.id} value={client.id}>{client.company_name}</option>
-            ))}
-          </select>
-          <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Document title (optional)" className={inputClass} />
-          <select value={category} onChange={(event) => setCategory(event.target.value)} className={inputClass}>
-            <option value="">Document type (optional)</option>
-            {DOCUMENT_TYPES.map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-          <select value={confidentiality} onChange={(event) => setConfidentiality(event.target.value)} className={inputClass}>
-            <option value="confidential">Confidential</option>
-            <option value="restricted">Restricted · Director/Admin only</option>
-          </select>
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-muted-foreground">
-            Leave the client blank for internal circulars, memos and shared office documents. Audit, Tax, Advisory and project workpapers remain in their own workspaces.
-          </p>
-          <label className={"inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm text-primary-foreground " + (busy ? "cursor-not-allowed opacity-60" : "cursor-pointer")}>
-            <Upload className="h-4 w-4" />
-            {busy ? "Uploading…" : "Choose file & upload"}
-            <input type="file" hidden onChange={upload} disabled={busy} />
-          </label>
-        </div>
-      </section>
+        <select value={filterClient} onChange={(event) => setFilterClient(event.target.value)} className={inputClass + " sm:max-w-xs"} aria-label="Show documents for">
+          <option value="">All documents</option>
+          <option value="__internal__">Internal (GK)</option>
+          {clients.map((client) => <option key={client.id} value={client.id}>{client.company_name}</option>)}
+        </select>
+      </div>
 
-      <section className="space-y-3 rounded-lg border bg-card p-3 sm:p-4">
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <div className="relative min-w-0 flex-1">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search documents or clients…" className={inputClass + " pl-9"} />
-          </div>
-          <select value={filterClient} onChange={(event) => setFilterClient(event.target.value)} className={inputClass + " sm:max-w-xs"}>
-            <option value="">All documents</option>
-            <option value="__internal__">Internal GK documents</option>
-            {clients.map((client) => (
-              <option key={client.id} value={client.id}>{client.company_name}</option>
-            ))}
-          </select>
-        </div>
+      <ul className="divide-y rounded-lg border bg-card">
+        {filteredRows.length === 0 && (
+          <li className="px-3 py-12 text-center text-sm text-muted-foreground">
+            {rows.length === 0 ? "No documents yet. Use Upload to add the first one." : "No documents match."}
+          </li>
+        )}
+        {filteredRows.map((row) => (
+          <li key={row.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted/30">
+            <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <button type="button" onClick={() => void view(row)} className="min-w-0 flex-1 text-left" title="View">
+              <span className="block break-words text-sm font-medium hover:text-primary">{row.title}</span>
+              <span className="block text-xs text-muted-foreground">
+                {row.clientName} · {typeLabel(row)} · {formatDate(row.createdAt)}
+                {row.confidentiality === "restricted" && <span className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-700 dark:text-amber-300">Restricted</span>}
+              </span>
+            </button>
+            <button type="button" onClick={() => void download(row)} aria-label={"Download " + row.title} title="Download" className="shrink-0 rounded-md p-2 hover:bg-muted"><Download className="h-4 w-4" /></button>
+            <button type="button" onClick={() => void remove(row)} aria-label={"Delete " + row.title} title="Delete" className="shrink-0 rounded-md p-2 text-destructive hover:bg-muted"><Trash2 className="h-4 w-4" /></button>
+          </li>
+        ))}
+      </ul>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-          <span>Showing {filteredRows.length} of {rows.length} documents</span>
-          <span>{internalCount} internal GK document{internalCount === 1 ? "" : "s"}</span>
+      {adding && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !busy && closeUpload()}>
+          <form onSubmit={upload} onClick={(event) => event.stopPropagation()} className="w-full max-w-md space-y-3 rounded-lg bg-card p-5">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Upload document</h2>
+              <button type="button" onClick={closeUpload} disabled={busy} aria-label="Close"><X className="h-4 w-4" /></button>
+            </div>
+            <input type="file" required onChange={(event) => setFile(event.target.files?.[0] ?? null)} className="block w-full text-sm" aria-label="File" />
+            <label className="block text-xs text-muted-foreground">For
+              <select value={clientId} onChange={(event) => setClientId(event.target.value)} className={inputClass + " mt-1 text-foreground"}>
+                <option value="">Internal (GK)</option>
+                {clients.map((client) => <option key={client.id} value={client.id}>{client.company_name}</option>)}
+              </select>
+            </label>
+            <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Name (defaults to the file name)" className={inputClass} />
+            <select value={category} onChange={(event) => setCategory(event.target.value)} className={inputClass} aria-label="Type">
+              <option value="">General document</option>
+              {DOCUMENT_TYPES.slice(1).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={confidentiality === "restricted"} onChange={(event) => setConfidentiality(event.target.checked ? "restricted" : "confidential")} />
+              Only Director/Admin can see this
+            </label>
+            <button disabled={!file || busy} className="h-10 w-full rounded-md bg-primary text-sm font-medium text-primary-foreground disabled:opacity-50">{busy ? "Uploading…" : "Upload"}</button>
+          </form>
         </div>
-
-        <div className="overflow-x-auto rounded-md border">
-          <table className="w-full min-w-[650px] text-sm">
-            <thead className="bg-muted text-left text-xs text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2">Document</th>
-                <th className="px-3 py-2">Client / circulation</th>
-                <th className="px-3 py-2">Type</th>
-                <th className="px-3 py-2">Uploaded</th>
-                <th className="px-3 py-2 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredRows.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-3 py-12 text-center text-muted-foreground">
-                    No documents found. Upload a file to start the library.
-                  </td>
-                </tr>
-              )}
-              {filteredRows.map((row) => (
-                <tr key={row.id} className="border-t align-top hover:bg-muted/20">
-                  <td className="max-w-[280px] px-3 py-2">
-                    <div className="flex items-start gap-2">
-                      <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                      <div className="min-w-0">
-                        <div className="break-words font-medium">{row.title}</div>
-                        {row.confidentiality === "restricted" && (
-                          <span className="mt-1 inline-block rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-700">Restricted</span>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-3 py-2">{row.clientName}</td>
-                  <td className="px-3 py-2">{TYPE_LABELS[row.category] || row.category.replaceAll("_", " ")}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">{formatDate(row.createdAt)}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-right">
-                    <div className="inline-flex items-center gap-3">
-                      <button onClick={() => void view(row)} className="inline-flex items-center gap-1 text-xs text-primary">
-                        <Eye className="h-3 w-3" />View
-                      </button>
-                      <button onClick={() => void download(row)} className="inline-flex items-center gap-1 text-xs text-primary">
-                        <Download className="h-3 w-3" />Download
-                      </button>
-                      <button onClick={() => void remove(row)} aria-label={"Delete " + row.title} className="text-destructive">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      )}
 
       {preview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setPreview(null)}>
