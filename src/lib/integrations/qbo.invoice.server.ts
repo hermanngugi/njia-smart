@@ -150,7 +150,7 @@ async function persistQboInvoiceSnapshot(connection: Connection, clientId: strin
     integration_id: connection.id, client_id: clientId,
     local_record_type: "invoice", local_record_id: localInvoiceId,
     external_record_type: "Invoice", external_record_id: externalId,
-    metadata: { document_number: fields.doc_number, status, total_amount: total, balance_amount: balance, amount_paid: fields.amount_paid, synced_at: syncedAt },
+    metadata: { document_number: fields.doc_number, status, total_amount: total, balance_amount: balance, amount_paid: fields.amount_paid, currency_code: fields.currency_code, synced_at: syncedAt },
     last_synced_at: syncedAt, updated_at: syncedAt,
   }, { onConflict: "integration_id,local_record_type,local_record_id" });
   if (mapError) throw new QboInvoiceError("invoice_mapping_failed", "QuickBooks returned an invoice, but Njia Smart could not save its link. Retry safely; the same request ID is used.");
@@ -165,7 +165,7 @@ async function persistQboInvoiceSnapshot(connection: Connection, clientId: strin
   }, { onConflict: "integration_id,external_record_type,external_record_id" });
   if (mirrorError) throw new QboInvoiceError("invoice_mirror_failed", "The QuickBooks invoice was linked, but its latest status could not be mirrored.");
   await db.from("client_integrations").update({ last_synced_at: syncedAt, updated_at: syncedAt }).eq("id", connection.id);
-  return { externalId, documentNumber: fields.doc_number, status, total, amountPaid: fields.amount_paid, balance, syncedAt };
+  return { externalId, documentNumber: fields.doc_number, status, total, amountPaid: fields.amount_paid, balance, currencyCode: fields.currency_code ?? "KES", syncedAt };
 }
 
 export async function sendNjiaInvoiceToQbo(connection: Connection, clientId: string, invoiceId: string) {
