@@ -38,13 +38,16 @@ function safeId(value: unknown) {
 function asText(value: unknown, max = 250) { return typeof value === "string" ? value.slice(0, max) : null; }
 function asNumber(value: unknown) { const n = Number(value); return Number.isFinite(n) ? n : 0; }
 
-export async function listQboInvoiceSetup(connection: Connection, clientId: string) {
-  const [customers, items, mapping] = await Promise.all([
+export async function listQboInvoiceSetup(connection: Connection, clientId: string, invoiceId?: string) {
+  const [customers, items, mapping, invoiceMapping] = await Promise.all([
     request<Json>(connection, queryPath("select Id, DisplayName, CompanyName, PrimaryEmailAddr from Customer where Active = true MAXRESULTS 1000")),
     request<Json>(connection, queryPath("select Id, Name, Description, Type, Active from Item where Type = 'Service' and Active = true MAXRESULTS 1000")),
     db.from("integration_record_mappings").select("external_record_id,metadata")
       .eq("integration_id", connection.id).eq("client_id", clientId)
       .eq("local_record_type", "client").eq("local_record_id", clientId).maybeSingle(),
+    invoiceId ? db.from("integration_record_mappings").select("external_record_id,metadata,last_synced_at")
+      .eq("integration_id", connection.id).eq("client_id", clientId)
+      .eq("local_record_type", "invoice").eq("local_record_id", invoiceId).maybeSingle() : Promise.resolve({ data: null }),
   ]);
   const customerRows = Array.isArray(customers.QueryResponse?.Customer) ? customers.QueryResponse.Customer : [];
   const itemRows = Array.isArray(items.QueryResponse?.Item) ? items.QueryResponse.Item : [];
@@ -53,6 +56,7 @@ export async function listQboInvoiceSetup(connection: Connection, clientId: stri
     serviceItems: itemRows.map((r: Json) => ({ id: String(r.Id), name: asText(r.Name) ?? String(r.Id), description: asText(r.Description) })),
     customerId: mapping.data?.external_record_id ?? null,
     serviceItemId: asText(connection.metadata?.qbo_services_item_id, 100),
+    invoiceLink: invoiceMapping.data ? { externalId: invoiceMapping.data.external_record_id, ...(invoiceMapping.data.metadata ?? {}), syncedAt: invoiceMapping.data.last_synced_at } : null,
   };
 }
 
