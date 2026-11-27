@@ -4,16 +4,17 @@
  */
 
 export const PACK_ID = "ke-private-financial-audit";
-export const PACK_VERSION = 1;
+/** Five-step checklist (pack v2). v1 is kept in the database for history but is no longer offered. */
+export const PACK_VERSION = 2;
 
 /** Procedure statuses as stored in the database. */
 export const STATUS_LABEL: Record<string, string> = {
   not_started: "Not started",
   in_progress: "In progress",
   prepared: "Ready for review",
-  under_review: "Being reviewed",
-  review_notes: "Changes requested",
-  completed: "Done",
+  under_review: "Ready for review",
+  review_notes: "Sent back",
+  completed: "Signed off",
   not_applicable: "Not applicable",
 };
 
@@ -31,9 +32,10 @@ export const isDone = (status: string) => status === "completed" || status === "
 
 /** What the preparer can set. Review outcomes are only set through sign-off. */
 export const PREPARER_STATUS_CHOICES: { value: string; label: string; help: string }[] = [
-  { value: "in_progress", label: "Still working on it", help: "Save your progress. Nobody is asked to review yet." },
-  { value: "prepared", label: "Ready for review", help: "Work and conclusion are complete. A reviewer will check and approve it." },
-  { value: "not_applicable", label: "Not applicable to this audit", help: "This step does not apply to this client." },
+  { value: "not_started", label: "Not started", help: "Nothing done yet." },
+  { value: "in_progress", label: "In progress", help: "Save your progress. Nobody is asked to review yet." },
+  { value: "prepared", label: "Ready for review", help: "Work and conclusion are complete. The reviewer checks and signs off, or sends it back with a comment." },
+  { value: "not_applicable", label: "Not applicable", help: "This step does not apply to this client." },
 ];
 
 export const RISK_STATUS_LABEL: Record<string, string> = {
@@ -72,112 +74,7 @@ export function riskRating(likelihood: string | null, impact: string | null): { 
   return { label: "Low risk", tone: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200" };
 }
 
-export type AuditTabKey = "overview" | "procedures" | "risks" | "documents" | "tasks" | "review";
+export type AuditTabKey = "checklist" | "documents" | "review";
 
-export type NextStep = {
-  title: string;
-  detail: string;
-  tab: AuditTabKey;
-  actionLabel: string;
-  procedureId?: string;
-};
-
-type StepProcedure = {
-  id: string;
-  title: string;
-  status: string;
-  required: boolean;
-  dependencies: string[];
-  procedureId: string;
-  assigned_reviewer_id: string | null;
-};
-
-/**
- * One clear "do this next" suggestion for the signed-in person.
- * Order: set up checklist → fix review comments → review what is waiting for
- * me → hand-off work that has no reviewer → next procedure → wrap up.
- */
-export function computeNextStep(input: {
-  procedures: StepProcedure[];
-  userId: string | null;
-  openRisks: number;
-}): NextStep {
-  const { procedures, userId } = input;
-  if (procedures.length === 0) {
-    return {
-      title: "Set up the audit checklist",
-      detail: "This creates the step-by-step programme for this audit so you can track every procedure from start to sign-off.",
-      tab: "procedures",
-      actionLabel: "Set up checklist",
-    };
-  }
-
-  const changes = procedures.find((p) => p.status === "review_notes");
-  if (changes) {
-    return {
-      title: `Address the reviewer’s comments: ${changes.title}`,
-      detail: "A reviewer asked for changes. Update the work, then mark it ready for review again.",
-      tab: "procedures",
-      actionLabel: "Open this step",
-      procedureId: changes.id,
-    };
-  }
-
-  const mine = procedures.filter((p) => p.assigned_reviewer_id === userId && (p.status === "prepared" || p.status === "under_review"));
-  if (userId && mine.length > 0) {
-    return {
-      title: `${mine.length} step${mine.length === 1 ? " is" : "s are"} waiting for your review`,
-      detail: "Read the work and conclusion, then approve it or send it back with comments.",
-      tab: "review",
-      actionLabel: "Go to review",
-    };
-  }
-
-  const noReviewer = procedures.find((p) => p.status === "prepared" && !p.assigned_reviewer_id);
-  if (noReviewer) {
-    return {
-      title: `Choose a reviewer for: ${noReviewer.title}`,
-      detail: "This step is ready but nobody has been asked to review it.",
-      tab: "review",
-      actionLabel: "Assign reviewer",
-    };
-  }
-
-  const statusOf = new Map(procedures.map((p) => [p.procedureId, p.status]));
-  const next = procedures.find(
-    (p) =>
-      (p.status === "not_started" || p.status === "in_progress") &&
-      p.dependencies.every((d) => {
-        const s = statusOf.get(d);
-        return s === undefined || isDone(s);
-      }),
-  );
-  if (next) {
-    return {
-      title: `${next.status === "in_progress" ? "Continue" : "Start"}: ${next.title}`,
-      detail: input.openRisks === 0 && next.status === "not_started"
-        ? "Tip: record the risks you have identified in the Risks tab as you go."
-        : "This is the next step in the audit programme.",
-      tab: "procedures",
-      actionLabel: next.status === "in_progress" ? "Continue" : "Start",
-      procedureId: next.id,
-    };
-  }
-
-  const waiting = procedures.filter((p) => !isDone(p.status));
-  if (waiting.length > 0) {
-    return {
-      title: `${waiting.length} step${waiting.length === 1 ? " is" : "s are"} with reviewers`,
-      detail: "Nothing for you to do right now. Follow up with the assigned reviewers.",
-      tab: "review",
-      actionLabel: "See review status",
-    };
-  }
-
-  return {
-    title: "All procedures are complete",
-    detail: "Every step is approved or not applicable. You can now mark the engagement as completed (an invoice is required).",
-    tab: "overview",
-    actionLabel: "Review summary",
-  };
-}
+/** Steps a reviewer can act on (the database keeps two legacy values for the same stage). */
+export const isInReview = (status: string) => status === "prepared" || status === "under_review";

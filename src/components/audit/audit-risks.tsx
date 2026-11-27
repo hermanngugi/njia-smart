@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, Plus, ShieldAlert, X } from "lucide-react";
+import { Plus, ShieldAlert, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { ASSERTIONS, COMMON_AREAS, RISK_STATUS_LABEL, riskRating } from "@/lib/audit/guidance";
@@ -26,14 +26,12 @@ export function AuditRisks({ engagementId, data }: { engagementId: string; data:
     return (
       <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 space-y-1">
         <h3 className="font-semibold text-sm">The audit database is not set up yet</h3>
-        <p className="text-sm">Apply the three audit migrations in order, then refresh this page.</p>
+        <p className="text-sm">Refresh the page; if it persists, tell your administrator.</p>
         <p className="text-xs text-muted-foreground">Database message: {error}</p>
       </div>
     );
   }
 
-  const open_ = risks.filter((r) => r.status !== "closed");
-  const unaddressed = open_.filter((r) => r.procedureIds.length === 0);
 
   return (
     <div className="space-y-4">
@@ -41,18 +39,12 @@ export function AuditRisks({ engagementId, data }: { engagementId: string; data:
         <div className="max-w-2xl">
           <h2 className="font-semibold flex items-center gap-2"><ShieldAlert className="h-5 w-5 text-primary" /> Risks</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            A risk is something that could cause the client’s financial statements to be wrong. Record each one, rate it, and link the checklist steps that respond to it.
+            A risk is something that could cause the client’s financial statements to be wrong. Record each one, rate it, and say how you will respond.
           </p>
         </div>
         <button onClick={() => setOpen(true)} className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium inline-flex items-center gap-2"><Plus className="h-4 w-4" /> Add a risk</button>
       </div>
 
-      {unaddressed.length > 0 && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm flex items-start gap-2">
-          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-          <span>{unaddressed.length} risk{unaddressed.length === 1 ? " has" : "s have"} no checklist step linked yet. Open the step that responds to it in the Checklist tab and tick the risk.</span>
-        </div>
-      )}
 
       {loading && <p className="text-sm text-muted-foreground">Loading risks…</p>}
       {!loading && risks.length === 0 && (

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { CheckCircle2, CornerUpLeft, ShieldCheck, XCircle } from "lucide-react";
+import { CheckCircle2, CornerUpLeft, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { STATUS_LABEL, STATUS_TONE } from "@/lib/audit/guidance";
@@ -34,7 +34,7 @@ export function AuditReviewQueue({ data, staff }: { data: AuditData; staff: Staf
     if (err) toast.error(err.message); else { toast.success("Reviewer assigned"); await reload(); }
   }
 
-  async function decide(p: ProcedureRow, decision: "approved" | "changes_requested" | "rejected") {
+  async function decide(p: ProcedureRow, decision: "approved" | "changes_requested") {
     const text = (comments[p.id] ?? "").trim();
     if (decision !== "approved" && !text) return toast.error("Add a comment explaining what needs to change.");
     setBusyId(p.id);
@@ -43,7 +43,7 @@ export function AuditReviewQueue({ data, staff }: { data: AuditData; staff: Staf
     });
     setBusyId(null);
     if (err) return toast.error(err.message);
-    toast.success(decision === "approved" ? "Approved" : decision === "changes_requested" ? "Sent back with your comments" : "Rejected");
+    toast.success(decision === "approved" ? "Signed off" : "Sent back with your comments");
     setComments((old) => ({ ...old, [p.id]: "" }));
     await reload();
   }
@@ -52,7 +52,7 @@ export function AuditReviewQueue({ data, staff }: { data: AuditData; staff: Staf
     return (
       <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 space-y-1">
         <h3 className="font-semibold text-sm">Review cannot connect to the audit database</h3>
-        <p className="text-sm">Apply the three audit migrations in order, then refresh this page.</p>
+        <p className="text-sm">Refresh the page; if it persists, tell your administrator.</p>
         <p className="text-xs text-muted-foreground">Database message: {error}</p>
       </div>
     );
@@ -63,13 +63,13 @@ export function AuditReviewQueue({ data, staff }: { data: AuditData; staff: Staf
       <div className="rounded-lg border bg-card p-4">
         <h2 className="font-semibold flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /> Review and sign-off</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Every step must be approved by someone other than the person who did the work. Steps appear here once they are marked “Ready for review”.
+          Every step must be approved by someone other than the person who did the work. Steps appear here once the preparer marks them “Ready for review”.
         </p>
       </div>
 
       {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
       {!loading && procedures.length === 0 && (
-        <div className="rounded-lg border border-dashed bg-card p-6 text-center text-sm text-muted-foreground">Set up the checklist first (Checklist tab). Nothing to review yet.</div>
+        <div className="rounded-lg border border-dashed bg-card p-6 text-center text-sm text-muted-foreground">Start the checklist first (Checklist tab). Nothing to review yet.</div>
       )}
       {!loading && procedures.length > 0 && inReview.length === 0 && sentBack.length === 0 && (
         <div className="rounded-lg border border-dashed bg-card p-6 text-center text-sm text-muted-foreground">Nothing is waiting for review right now.</div>
@@ -89,9 +89,8 @@ export function AuditReviewQueue({ data, staff }: { data: AuditData; staff: Staf
                       <textarea className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm" rows={2} value={comments[p.id] ?? ""} onChange={(e) => setComments((o) => ({ ...o, [p.id]: e.target.value }))} placeholder="What is missing or wrong?" />
                     </label>
                     <div className="flex flex-wrap gap-2">
-                      <button disabled={busyId === p.id} onClick={() => void decide(p, "approved")} className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm inline-flex items-center gap-2 disabled:opacity-50"><CheckCircle2 className="h-4 w-4" /> Approve</button>
-                      <button disabled={busyId === p.id} onClick={() => void decide(p, "changes_requested")} className="h-9 px-3 rounded-md border text-sm inline-flex items-center gap-2 hover:bg-muted disabled:opacity-50"><CornerUpLeft className="h-4 w-4" /> Send back for changes</button>
-                      <button disabled={busyId === p.id} onClick={() => void decide(p, "rejected")} className="h-9 px-3 rounded-md border text-sm inline-flex items-center gap-2 hover:bg-muted text-destructive disabled:opacity-50"><XCircle className="h-4 w-4" /> Reject</button>
+                      <button disabled={busyId === p.id} onClick={() => void decide(p, "approved")} className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm inline-flex items-center gap-2 disabled:opacity-50"><CheckCircle2 className="h-4 w-4" /> Sign off</button>
+                      <button disabled={busyId === p.id} onClick={() => void decide(p, "changes_requested")} className="h-9 px-3 rounded-md border text-sm inline-flex items-center gap-2 hover:bg-muted disabled:opacity-50"><CornerUpLeft className="h-4 w-4" /> Send back</button>
                     </div>
                   </div>
                 )}
@@ -128,7 +127,7 @@ export function AuditReviewQueue({ data, staff }: { data: AuditData; staff: Staf
           {sentBack.map((p) => (
             <Card key={p.id} p={p} preparer={nameOf(p.latest?.prepared_by ?? null)} compact>
               {p.latestSignoff?.comments && <p className="text-sm"><strong>{nameOf(p.latestSignoff.reviewer_id)} said:</strong> {p.latestSignoff.comments}</p>}
-              <p className="text-xs text-muted-foreground">The preparer needs to update this step in the Checklist tab and send it for review again.</p>
+              <p className="text-xs text-muted-foreground">The owner updates this step in the Checklist tab and sends it for review again.</p>
             </Card>
           ))}
         </Group>
@@ -136,7 +135,7 @@ export function AuditReviewQueue({ data, staff }: { data: AuditData; staff: Staf
 
       {approved.length > 0 && (
         <details className="rounded-lg border bg-card p-3">
-          <summary className="cursor-pointer text-sm font-medium">Approved ({approved.length})</summary>
+          <summary className="cursor-pointer text-sm font-medium">Signed off ({approved.length})</summary>
           <ul className="mt-2 space-y-1 text-sm">
             {approved.map((p) => (
               <li key={p.id} className="flex flex-wrap items-center justify-between gap-2">

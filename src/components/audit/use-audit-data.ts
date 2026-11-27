@@ -31,6 +31,7 @@ export type ProcedureRow = {
   status: string;
   assigned_to: string | null;
   assigned_reviewer_id: string | null;
+  due_date: string | null;
   title: string;
   sectionId: string;
   required: boolean;
@@ -144,6 +145,7 @@ export function useAuditData(engagementId: string) {
         status: p.status,
         assigned_to: p.assigned_to ?? null,
         assigned_reviewer_id: p.assigned_reviewer_id ?? null,
+        due_date: p.due_date ?? null,
         title: d?.title ?? p.procedure_id,
         sectionId: d?.section_id ?? "planning",
         required: d?.required ?? true,
@@ -187,7 +189,7 @@ export function useAuditData(engagementId: string) {
   }
 
   const sections: SectionGroup[] = useMemo(() => {
-    const known = getAuditWorkspaceSections();
+    const known = getAuditWorkspaceSections(PACK_ID, PACK_VERSION);
     const groups = known.map((s) => {
       const list = procedures.filter((p) => p.sectionId === s.id);
       return { id: s.id, label: s.label, description: s.description, procedures: list, done: list.filter((p) => isDone(p.status)).length };
