@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { ArrowLeft, Plus, Trash2, Printer, Save, Paperclip, FileText } from "lucide-react";
 import { formatDate, formatDateTime, STATUS_COLORS } from "@/lib/format";
 import { useAuth } from "@/lib/auth";
+import { QboInvoicePanel } from "@/components/qbo-invoice-panel";
 
 export const Route = createFileRoute("/_authed/accounts/$id")({ component: InvoiceDetail });
 
@@ -289,6 +290,8 @@ function InvoiceDetail() {
         </div>
       </div>
       )}
+
+      <QboInvoicePanel clientId={inv.client_id} invoiceId={inv.id} invoiceStatus={inv.status} />
 
       {/* Payments */}
       <div className="rounded-lg border bg-card p-4 print:hidden">

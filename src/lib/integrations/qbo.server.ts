@@ -3,15 +3,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 const AUTHORIZATION_ENDPOINT = "https://appcenter.intuit.com/connect/oauth2";
 const TOKEN_ENDPOINT = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer";
 const REVOCATION_ENDPOINT = "https://developer.api.intuit.com/v2/oauth2/tokens/revoke";
-export const QBO_REQUESTED_SCOPES = [
-  "com.intuit.quickbooks.accounting",
-  "com.intuit.quickbooks.payment",
-  "openid",
-  "profile",
-  "email",
-  "phone",
-  "address",
-] as const;
+export const QBO_REQUESTED_SCOPES = ["com.intuit.quickbooks.accounting"] as const;
 
 export type QboConfig = {
   clientId: string;
