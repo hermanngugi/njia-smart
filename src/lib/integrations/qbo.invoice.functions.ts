@@ -32,11 +32,11 @@ async function connectionFor(clientId: string, integrationId: string) {
 
 export const getQboInvoiceSetup = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => base.parse(input))
+  .inputValidator((input: unknown) => base.extend({ invoice_id: z.string().uuid().optional() }).parse(input))
   .handler(async ({ data, context }) => {
     await assertAccess(context.userId, data.client_id, "view");
     const connection = await connectionFor(data.client_id, data.integration_id);
-    return listQboInvoiceSetup(connection, data.client_id);
+    return listQboInvoiceSetup(connection, data.client_id, data.invoice_id);
   });
 
 export const saveQboInvoiceSetupFn = createServerFn({ method: "POST" })
