@@ -104,7 +104,8 @@ export function QboInvoicePanel({ clientId, invoiceId, invoiceStatus }: {
     </section>
   );
 
-  const linked = Boolean(sync?.externalId);\n  const mappingReady = Boolean(setup?.customerId && setup?.serviceItemId && customerId === setup.customerId && serviceItemId === setup.serviceItemId);
+  const linked = Boolean(sync?.externalId);
+  const mappingReady = Boolean(setup?.customerId && setup?.serviceItemId && customerId === setup.customerId && serviceItemId === setup.serviceItemId);
   return (
     <section className="space-y-3 rounded-lg border bg-card p-4 print:hidden">
       <div className="flex flex-wrap items-center justify-between gap-2">
