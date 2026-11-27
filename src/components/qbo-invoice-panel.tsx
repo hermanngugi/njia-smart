@@ -14,6 +14,7 @@ type Setup = {
   serviceItems: Array<{ id: string; name: string; description: string | null }>;
   customerId: string | null;
   serviceItemId: string | null;
+  invoiceLink: { externalId: string; document_number?: string; status?: string; total_amount?: number; amount_paid?: number; balance_amount?: number; syncedAt?: string } | null;
 };
 type SyncResult = {
   externalId: string;
@@ -52,6 +53,7 @@ export function QboInvoicePanel({ clientId, invoiceId, invoiceStatus }: {
       setSetup(result);
       setCustomerId(result.customerId ?? "");
       setServiceItemId(result.serviceItemId ?? "");
+      if (result.invoiceLink) setSync({ externalId: result.invoiceLink.externalId, documentNumber: result.invoiceLink.document_number ?? null, status: result.invoiceLink.status ?? "sent", total: Number(result.invoiceLink.total_amount ?? 0), amountPaid: Number(result.invoiceLink.amount_paid ?? 0), balance: Number(result.invoiceLink.balance_amount ?? 0), syncedAt: result.invoiceLink.syncedAt ?? new Date().toISOString() });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not load QuickBooks invoice settings.");
     } finally { setBusy(null); }
