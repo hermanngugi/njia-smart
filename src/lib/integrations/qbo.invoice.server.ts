@@ -91,7 +91,7 @@ export async function saveQboInvoiceSetup(connection: Connection, clientId: stri
 
 async function getInvoice(connection: Connection, clientId: string, invoiceId: string) {
   const { data, error } = await db.from("invoices")
-    .select("id,invoice_number,client_id,issue_date,due_date,currency,subtotal,vat_rate,vat_amount,total,amount_paid,status,notes,memo,clients(id,company_name,kra_pin,email,phone),invoice_items(id,item_name,description,quantity,unit_price,amount,sort_order)")
+    .select("id,invoice_number,client_id,issue_date,due_date,currency,total,status,invoice_items(id,item_name,description,quantity,unit_price,sort_order)")
     .eq("id", invoiceId).eq("client_id", clientId).maybeSingle();
   if (error || !data) throw new QboInvoiceError("invoice_not_found", "Njia Smart invoice was not found for this client.");
   if (data.status === "draft") throw new QboInvoiceError("invoice_not_final", "Finalise the invoice in Njia Smart before sending it to QuickBooks.");
