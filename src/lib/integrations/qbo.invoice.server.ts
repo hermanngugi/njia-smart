@@ -197,15 +197,36 @@ export async function sendNjiaInvoiceToQbo(connection: Connection, clientId: str
     throw new QboInvoiceError("currency_mismatch", `This QuickBooks Customer uses ${customerCurrency}; the Njia Smart invoice is ${invoice.currency}. Match a customer configured for the same currency.`);
   }
 
+  const companyInfo = await request<Json>(connection, `companyinfo/${encodeURIComponent(connection.external_account_id)}`);
+  const companyCountry = asText(companyInfo.CompanyInfo?.Country, 80)?.trim().toUpperCase();
+  if (!companyCountry) throw new QboInvoiceError("company_country_unknown", "QuickBooks company country could not be determined; the invoice was not sent.");
+  const isUsCompany = ["US", "USA", "UNITED STATES", "UNITED STATES OF AMERICA"].includes(companyCountry);
+
+  const itemResponse = await request<Json>(connection, `item/${serviceItemId}`);
+  const serviceItem = itemResponse.Item;
+  if (!serviceItem || serviceItem.Type !== "Service" || serviceItem.Active === false) {
+    throw new QboInvoiceError("service_item_invalid", "The shared QuickBooks Service item is missing or inactive.");
+  }
+  if (serviceItem.SalesTaxIncluded === true) {
+    throw new QboInvoiceError("service_item_tax_inclusive", "The shared QuickBooks Service item is configured as tax-inclusive. Set it to tax-exclusive to match Njia Smart invoice line prices.");
+  }
+  const nonUsSalesTaxCode = asText(serviceItem.SalesTaxCodeRef?.value, 100);
+  if (!isUsCompany && !nonUsSalesTaxCode) {
+    throw new QboInvoiceError("service_tax_code_missing", "Configure the sales tax code on the shared QuickBooks Service item before sending invoices.");
+  }
+  const usSalesTaxEnabled = preferences.TaxPrefs?.UsingSalesTax === true;
   const lines = [...invoice.invoice_items].sort((a: Json, b: Json) => Number(a.sort_order) - Number(b.sort_order)).map((line: Json) => {
     const quantity = asNumber(line.quantity);
     const unitPrice = asNumber(line.unit_price);
     if (quantity <= 0 || unitPrice < 0) throw new QboInvoiceError("invalid_line", "An invoice line has an invalid quantity or rate.");
+    const salesItemLineDetail: Json = { ItemRef: { value: serviceItemId }, Qty: quantity, UnitPrice: unitPrice };
+    if (!isUsCompany) salesItemLineDetail.TaxCodeRef = { value: nonUsSalesTaxCode };
+    else if (usSalesTaxEnabled) salesItemLineDetail.TaxCodeRef = { value: serviceItem.Taxable === false ? "NON" : "TAX" };
     return {
       Amount: Number((quantity * unitPrice).toFixed(2)),
       DetailType: "SalesItemLineDetail",
       Description: [asText(line.item_name, 150), asText(line.description, 500)].filter(Boolean).join(" — ").slice(0, 4000),
-      SalesItemLineDetail: { ItemRef: { value: serviceItemId }, Qty: quantity, UnitPrice: unitPrice },
+      SalesItemLineDetail: salesItemLineDetail,
     };
   });
   const payload: Json = {
@@ -217,10 +238,10 @@ export async function sendNjiaInvoiceToQbo(connection: Connection, clientId: str
     CustomerMemo: { value: `Njia Smart invoice ${invoice.invoice_number}` },
   };
   if (multiCurrency && invoice.currency) payload.CurrencyRef = { value: invoice.currency };
-  const companyInfo = await request<Json>(connection, `companyinfo/${encodeURIComponent(connection.external_account_id)}`);
-  const companyCountry = asText(companyInfo.CompanyInfo?.Country, 80)?.trim().toUpperCase();
-  if (!companyCountry) throw new QboInvoiceError("company_country_unknown", "QuickBooks company country could not be determined; the invoice was not sent.");
-  if (!["US", "USA", "UNITED STATES", "UNITED STATES OF AMERICA"].includes(companyCountry)) payload.GlobalTaxCalculation = "TaxExcluded";
+  if (!isUsCompany) payload.GlobalTaxCalculation = "TaxExcluded";
+  else if (usSalesTaxEnabled && customer.DefaultTaxCodeRef?.value) {
+    payload.TxnTaxDetail = { TxnTaxCodeRef: { value: String(customer.DefaultTaxCodeRef.value) } };
+  }
   const requestId = invoice.id;
   const result = await request<Json>(connection, `invoice?requestid=${requestId}`, {
     method: "POST", body: JSON.stringify(payload),
