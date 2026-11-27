@@ -235,259 +235,59 @@
 }
 
 /* =========================================================================
-   PHONES & TABLETS (Android Chrome and friends)
-   Global rules so every page behaves on touch screens without each page
-   having to remember. Plain (unlayered) CSS on purpose: it overrides the
-   Tailwind utilities it needs to.
+   LAYOUT: desktop first, with a small set of safeguards for phones.
+   The frame itself (sidebar, top bar, page width) lives in app-shell.tsx;
+   do not override its widths from here.
    ========================================================================= */
 
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-
-/* Pulling down inside the app must not trigger Chrome's pull-to-refresh and
-   throw away a half-typed form or chat message. */
 body { overscroll-behavior-y: contain; }
 
-/* Android Chrome counts the area behind the address bar in "100vh", which pushes
-   the bottom of full-height screens (sidebar Sign out, dialogs) out of view. Use
-   the dynamic viewport instead. */
+/* Mobile browsers count the area behind the address bar in "100vh". */
 @supports (height: 100dvh) {
   .h-screen { height: 100dvh; }
   .min-h-screen { min-height: 100dvh; }
-  .h-\[90vh\] { height: 90dvh; }
   .max-h-\[90vh\] { max-height: 90dvh; }
   .max-h-\[92vh\] { max-height: 92dvh; }
   .max-h-\[94vh\] { max-height: 94dvh; }
-  .max-h-\[70vh\] { max-height: 70dvh; }
-  .max-h-\[50vh\] { max-height: 50dvh; }
 }
 
-/* Controls that only appear on mouse hover (Delete, Stop, Reopen...) never
-   appear on a touch screen, so show them. */
-@media (hover: none) {
-  [class*="group-hover:opacity-100"],
-  [class*="hover:opacity-100"] { opacity: 1; }
-}
-
-/* A table wider than the screen scrolls sideways inside its card instead of
-   being clipped. */
-:has(> table) { overflow-x: auto; }
+/* A table wider than its card scrolls inside the card. */
+:has(> table) { max-width: 100%; overflow-x: auto; }
 @media print { :has(> table) { overflow: visible; } }
 
-/* Pop-up windows taller than the screen (long forms, keyboard open) scroll
-   instead of being cut off at the top and bottom. */
-[class~="fixed"][class~="inset-0"][class~="items-center"][class~="justify-center"] {
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
+/* Pop-up windows taller than the screen scroll instead of being cut off. */
+[class~="fixed"][class~="inset-0"][class~="items-center"][class~="justify-center"] { overflow-y: auto; }
 @supports (align-items: safe center) {
   [class~="fixed"][class~="inset-0"][class~="items-center"][class~="justify-center"] { align-items: safe center; }
 }
 
-/* Fingers are bigger than mouse pointers. */
-@media (pointer: coarse) {
-  /* Small icon-only buttons get a bigger tap area without changing the layout. */
-  :is(button, [role="button"]):is([class~="p-0.5"], [class~="p-1"], [class~="p-1.5"]):not([class~="absolute"]):not([class~="fixed"]):not([class~="sticky"]) {
-    position: relative;
-  }
-  :is(button, [role="button"]):is([class~="p-0.5"], [class~="p-1"], [class~="p-1.5"])::after {
-    content: "";
-    position: absolute;
-    inset: -8px;
-  }
-  /* Easier to tick, and fields tall enough to tap. */
-  input[type="checkbox"], input[type="radio"] { width: 1.15rem; height: 1.15rem; }
-  select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]) { min-height: 2.5rem; }
-}
-
-/* =========================================================================
-   RESPONSIVE APP FOUNDATION
-   Shared safeguards for phones, tablets, foldables and desktop.
-   ========================================================================= */
-
-html,
-body {
-  width: 100%;
-  max-width: 100%;
-  overflow-x: clip;
-}
-
-body {
-  min-width: 0;
-}
-
-.app-shell,
-.app-main-column,
-.app-main-content,
-.app-main-content > * {
-  min-width: 0;
-  max-width: 100%;
-}
-
-.app-topbar {
-  padding-left: max(0.5rem, env(safe-area-inset-left));
-  padding-right: max(0.5rem, env(safe-area-inset-right));
-}
-
-.app-sidebar {
-  width: min(18rem, calc(100vw - 1rem));
-  max-width: 100vw;
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
-  overscroll-behavior: contain;
-}
-
-.app-sidebar-backdrop {
-  touch-action: none;
-}
-
-.app-main-content {
-  padding-bottom: max(1rem, env(safe-area-inset-bottom));
-}
-
-img,
-video,
-canvas {
-  max-width: 100%;
-  height: auto;
-}
-
-/* Tables stay within their cards and scroll horizontally when their columns
-   need more room. This avoids forcing the whole page wider than the device. */
-:has(> table) {
-  max-width: 100%;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-}
-
-@media (max-width: 639px) {
-  .app-main-content {
-    padding: 0.75rem;
-  }
-
-  .app-topbar {
-    gap: 0.375rem;
-  }
-
-  .app-topbar-actions {
-    gap: 0;
-  }
-
-  .app-topbar-actions > * {
-    flex-shrink: 0;
-  }
-
-  /* Three- and four-column statistic / shortcut grids become two columns. */
-  .app-main-content [class~="grid-cols-3"],
-  .app-main-content [class~="grid-cols-4"],
-  .app-main-content [class~="grid-cols-5"],
-  .app-main-content [class~="grid-cols-6"] {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
-
-  /* Form fields are easier to scan and operate one per row on a phone. */
-  .app-main-content form [class~="grid-cols-2"] {
-    grid-template-columns: minmax(0, 1fr) !important;
-  }
-
-  .app-main-content input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
-  .app-main-content select,
-  .app-main-content textarea {
-    min-width: 0;
-    max-width: 100%;
-    font-size: 16px;
-  }
-
-  .app-main-content [class~="overflow-x-auto"] {
-    max-width: 100%;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior-x: contain;
-  }
-
-  .app-main-content table {
-    font-size: 0.8125rem;
-  }
-
-  .app-main-content th,
-  .app-main-content td {
-    overflow-wrap: anywhere;
-  }
-
-  /* Keep paired page headings / action groups from forcing horizontal scroll. */
-  .app-main-content [class~="justify-between"] {
-    min-width: 0;
-  }
-
-  .app-main-content [class~="justify-between"] > :first-child {
-    min-width: 0;
-  }
-
-  /* Dialogs and popovers remain inside the visible mobile viewport. */
-  [role="dialog"] {
-    max-width: calc(100vw - 1rem);
-    max-height: calc(100dvh - 1rem);
-    overscroll-behavior: contain;
-  }
-
-  [data-radix-popper-content-wrapper] {
-    max-width: calc(100vw - 1rem);
-  }
-}
-
-@media (max-width: 380px) {
-  .app-main-content {
-    padding: 0.625rem;
-  }
-
-  .app-topbar-actions {
-    gap: 0;
-  }
-
-  .app-main-content h1.text-2xl {
-    font-size: 1.375rem;
-    line-height: 1.75rem;
-  }
+/* Hover-only controls must stay visible on touch screens. */
+@media (hover: none) {
+  [class*="group-hover:opacity-100"] { opacity: 1; }
 }
 
 @media (pointer: coarse) {
-  button,
-  a,
-  [role="button"] {
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  /* Native controls stay legible and comfortable without browser zooming. */
-  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
-  select,
-  textarea {
+  select, textarea, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]) {
+    min-height: 2.5rem;
     font-size: 16px;
   }
-
-  input[type="checkbox"],
-  input[type="radio"] {
-    width: 1.125rem;
-    height: 1.125rem;
-  }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html:focus-within {
-    scroll-behavior: auto;
-  }
-}
 @media (max-width: 639px) {
+  main [class~="grid-cols-3"],
+  main [class~="grid-cols-4"],
+  main [class~="grid-cols-5"],
+  main [class~="grid-cols-6"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  main form [class~="grid-cols-2"] { grid-template-columns: minmax(0, 1fr); }
+  main input, main select, main textarea { min-width: 0; max-width: 100%; }
+  /* Page heading and its buttons wrap instead of pushing off screen. */
+  main [class~="justify-between"] { flex-wrap: wrap; gap: 0.5rem; }
+
+  [role="dialog"] { max-width: calc(100vw - 1rem); max-height: calc(100dvh - 1rem); }
   .mobile-search-dialog {
     top: max(0.5rem, env(safe-area-inset-top)) !important;
-    left: 50% !important;
     width: calc(100vw - 1rem) !important;
-    max-height: calc(100dvh - 1rem) !important;
     translate: -50% 0 !important;
   }
-
-  .mobile-search-dialog [cmdk-list] {
-    max-height: min(50dvh, 22.5rem);
-  }
 }
-
