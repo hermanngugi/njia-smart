@@ -216,7 +216,9 @@ export async function sendNjiaInvoiceToQbo(connection: Connection, clientId: str
     CustomerMemo: { value: `Njia Smart invoice ${invoice.invoice_number}` },
   };
   if (multiCurrency && invoice.currency) payload.CurrencyRef = { value: invoice.currency };
-  if (connection.country_code && connection.country_code !== "US") payload.GlobalTaxCalculation = "TaxExcluded";
+  const companyInfo = await request<Json>(connection, `companyinfo/${encodeURIComponent(connection.external_account_id)}`);
+  const companyCountry = asText(companyInfo.CompanyInfo?.Country, 80)?.toUpperCase();
+  if (companyCountry && companyCountry !== "US") payload.GlobalTaxCalculation = "TaxExcluded";
   const requestId = invoice.id.replace(/-/g, "").slice(0, 36);
   const result = await request<Json>(connection, `invoice?requestid=${requestId}`, {
     method: "POST", body: JSON.stringify(payload),
