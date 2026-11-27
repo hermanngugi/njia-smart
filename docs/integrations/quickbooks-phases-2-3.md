@@ -22,7 +22,7 @@ The invoice is created in QuickBooks only. Njia Smart's operational invoice, loc
 
 ## Tax and currency behaviour
 
-Njia Smart does not send its own VAT amount or tax code. The selected QuickBooks Service item and mapped Customer determine QuickBooks' configured tax treatment. For non-US companies, the invoice uses `GlobalTaxCalculation: TaxExcluded`; US companies do not receive that field.
+Njia Smart does not send its own VAT amount or tax code. For non-US companies, the server reads the selected QuickBooks Service item's `SalesTaxCodeRef` and applies it to every invoice line, using `GlobalTaxCalculation: TaxExcluded`. For US companies, the line taxable flag is derived from the Service item's taxable setting (TAX/NON); the mapped Customer's default tax code is used when available. US companies do not receive `GlobalTaxCalculation`.
 
 All lines use the same Service item. Consequently, all lines follow the same QuickBooks item default tax treatment (subject to the Customer's tax settings). Mixed Standard / Exempt / Zero-rated tax lines within one Njia Smart invoice are not preserved as separate tax categories by this shared-item approach. Configure the shared Service item and Customer tax settings appropriately before sending.
 
