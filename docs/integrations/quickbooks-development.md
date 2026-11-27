@@ -1,168 +1,127 @@
-# QuickBooks Online – sandbox OAuth and API examples
+# QuickBooks Online — Njia Smart invoice integration (sandbox)
 
-This branch contains a server-side QuickBooks Online OAuth 2.0 authorization-code integration for Intuit's **Development sandbox**. It uses the existing Njia Smart client integration permissions and stores OAuth credentials in Supabase Vault.
+## Purpose and boundaries
 
-## 1. Intuit Developer app setup
+The integration follows a deliberately small workflow:
 
-In the Intuit Developer Portal, open your app and check **Development > Keys & OAuth**.
+1. Accounts creates and finalises an invoice in Njia Smart.
+2. Accounts sends that invoice to the connected QuickBooks Online company.
+3. QuickBooks remains the accounting system of record for payment recording and bank reconciliation.
+4. Njia Smart refreshes the linked QuickBooks invoice to show its status, amount paid and outstanding balance.
 
-Enable the APIs/scopes required by this example:
+Njia Smart does not create QuickBooks payments, reconcile bank accounts, import QuickBooks payments into its operational payment table, or overwrite its own invoice/payment records.
 
-- `com.intuit.quickbooks.accounting`
-- `com.intuit.quickbooks.payment`
-- `openid`
-- `profile`
-- `email`
-- `phone`
-- `address`
+This branch is sandbox-only. It must not be deployed with production Intuit credentials.
 
-These are the same combined Accounting, Payments and OpenID scopes used by Intuit's official Node.js OAuth 2.0 sample. The app must also have access to the QuickBooks Payments API in its sandbox configuration.
+## Intuit app setup
 
-### Njia Smart redirect URI
+The app requests only the QuickBooks Accounting scope:
 
-For Njia Smart, register the application's callback—not the Intuit Quickstart page—as a redirect URI:
+`com.intuit.quickbooks.accounting`
 
-`https://gk-nahashon-git-integrations-foundation-hermanngugis-projects.vercel.app/api/integrations/qbo/callback`
+Payment and OpenID scopes are not required for invoice creation or invoice-status reads.
 
-The value supplied in the Quickstart form, `https://developer.intuit.com/app/developer/quickstart`, is not the Njia Smart callback route. OAuth requires the redirect URI in the authorization request, token exchange, and Intuit app settings to match exactly. Use the Njia Smart callback above for the Preview integration.
+Register this exact callback in Intuit and configure the same URL as `QBO_REDIRECT_URI` in Vercel:
 
-Do not add a trailing slash, query string, or different path. For a local callback, use an HTTPS tunnel and register that exact tunnel callback URL in Intuit as well.
+`https://gk-nahashon.vercel.app/api/integrations/qbo/callback`
 
-## 2. Environment variables
+Confirm the deployed callback URL and Intuit developer-app setting match exactly before testing OAuth. Do not add a trailing slash, query string or different path.
 
-Set these in the **Preview** environment of the Vercel project, and in the repository-root `.env.local` for local development:
+## Environment variables
+
+Configure these as server-side Vercel Preview variables and in the ignored local `.env.local` for local development:
 
 ```dotenv
 QBO_ENVIRONMENT=sandbox
 QBO_CLIENT_ID=your_Intuit_Development_Client_ID
 QBO_CLIENT_SECRET=your_Intuit_Development_Client_Secret
-QBO_REDIRECT_URI=https://gk-nahashon-git-integrations-foundation-hermanngugis-projects.vercel.app/api/integrations/qbo/callback
+QBO_REDIRECT_URI=https://gk-nahashon.vercel.app/api/integrations/qbo/callback
 ```
 
-Use the Client ID supplied for your Intuit app. Obtain the Client Secret from **Development > Keys & OAuth** and set it directly in Vercel or the ignored local `.env.local` file. Never commit it, send it in chat, place it in `VITE_*` variables, or expose it to browser code.
+Never commit the client secret, place it in a `VITE_*` variable, or expose it to browser code. The server reads and rotates OAuth credentials through the existing Supabase Vault functions.
 
-For local OAuth, the redirect URI must point to a public HTTPS callback that reaches the local Njia Smart server, and that exact URL must be registered in Intuit. Otherwise, test OAuth on the Vercel Preview environment.
+## Client and Services-item setup
 
-## 3. Run Njia Smart locally
+For each Njia Smart client:
 
-The project uses Node.js 20 or later.
+1. Connect the client's QuickBooks company from the client's Integrations tab.
+2. Open an invoice for that client.
+3. Select the matching existing QuickBooks Customer.
+4. Select the existing active QuickBooks item of type **Service** to use for all invoice lines.
+5. Save the mapping.
 
-1. Install the repository dependencies from the project root:
+The Customer match is stored in `integration_record_mappings` as a client-to-customer link. The shared Service item ID is stored in the connected integration's server-side metadata. No new QuickBooks Customer or Service item is created by Njia Smart.
 
-   ```bash
-   npm install
-   ```
+## Sending an invoice
 
-2. Configure the regular Njia Smart Supabase environment variables in your local environment, as well as the four `QBO_*` variables above.
-3. Start the development server:
+Only a non-draft Njia Smart invoice with at least one line can be sent. The server reads the invoice and its line items directly from Supabase; it does not trust client-supplied amounts.
 
-   ```bash
-   npm run dev
-   ```
+Each Njia Smart line becomes a QuickBooks SalesItemLineDetail using the one shared Service item. It preserves:
+- line description (item name and description),
+- quantity,
+- unit price,
+- calculated line amount.
 
-4. Sign in to Njia Smart, open a client profile, and select **Integrations**.
-5. Select **Connect QuickBooks**, sign in with a QuickBooks sandbox company, and consent to the requested scopes.
+The same Service item is used for every line. Njia Smart does not send its own VAT amount or tax-code value. QuickBooks applies the tax treatment configured for the selected Service item and Customer. For non-US QuickBooks companies, the invoice uses `GlobalTaxCalculation: TaxExcluded`; US companies do not receive that field.
 
-The OAuth authorization-code flow uses a cryptographically random, single-use state value. The callback checks that state, exchanges the code once, and stores the access and refresh tokens in Supabase Vault. The regular integration table contains connection metadata and expiry timestamps, not the raw tokens.
+**Tax implication:** because all lines use one shared Service item, all lines follow that item's QuickBooks tax defaults (subject to the Customer's tax settings). If a single Njia Smart invoice contains a mixture of standard-rated, exempt and zero-rated lines, this one-item setup will not preserve those separate line-level tax classifications. The shared QuickBooks item and customer tax settings must therefore be configured to match the intended invoice treatment before sending.
 
-## 4. Run the API examples
+The invoice's currency must match the mapped QuickBooks Customer's currency (or the QuickBooks home currency). If the company has multicurrency enabled, the matching currency is explicitly supplied on the invoice. A mismatch is rejected rather than silently converting amounts.
 
-After the sandbox company shows **Connected**, use the **Sandbox API examples** section in that client's Integrations tab.
+## Duplicate protection and record linking
 
-### Company information – QuickBooks Accounting
+The local Njia Smart invoice UUID is used as the stable QuickBooks `requestid`. A successful QuickBooks invoice is linked through `integration_record_mappings` using the local invoice ID and external QuickBooks Invoice ID.
 
-The **Get company info** button sends:
+- Clicking Send again on an already linked invoice refreshes its QuickBooks status; it does not intentionally create another invoice.
+- A retry after a network interruption reuses the same stable request ID.
+- The QuickBooks invoice ID and document number are retained as the external link.
+- QuickBooks invoice snapshots are stored in the existing server-only `integration_external_records` mirror.
 
-```http
-GET https://sandbox-quickbooks.api.intuit.com/v3/company/{realmId}/companyinfo/{realmId}
-Authorization: Bearer {access_token}
-Accept: application/json
-```
+No change to the live invoice schema or existing RLS policies is required for this workflow.
 
-The realm ID is taken from the authenticated company's existing Njia Smart integration record; it is not accepted from the browser.
+## Refreshing payment status
 
-### OpenID Connect user information
+The **Refresh payment status** action reads the linked QuickBooks Invoice and displays:
+- QuickBooks invoice number / ID,
+- status: sent, partially paid, paid, overdue or voided when QuickBooks reports it,
+- amount paid (QuickBooks TotalAmt less Balance),
+- outstanding balance,
+- last sync time,
+- a link to open the invoice in the QuickBooks sandbox.
 
-The **Get OpenID user info** button sends:
+Njia Smart does not write the refreshed amounts or status back to its operational `invoices` or `payments` tables. Accounts continues to record and reconcile payments in QuickBooks.
 
-```http
-GET https://sandbox-accounts.platform.intuit.com/v1/openid_connect/userinfo
-Authorization: Bearer {access_token}
-Accept: application/json
-```
+## Permissions and safeguards
 
-This requires the OpenID scopes listed in Section 1. The result is displayed for the authorised staff member and is not stored as a Njia Smart client record.
+- The existing database-backed integration permission check governs view and sync actions.
+- OAuth state is random, single-use and time-limited.
+- Access and refresh tokens remain server-side in Supabase Vault.
+- QuickBooks requests run only from server functions and use the sandbox API host.
+- The invoice endpoint reads the invoice and items from the database and rejects draft/empty invoices.
+- The request ID is stable per Njia Smart invoice.
+- No service-role key or Intuit secret is sent to the browser.
 
-### Payments – create a sandbox charge
+## Verification checklist
 
-The **Payments sandbox charge** form accepts an Intuit one-time payment token, amount in USD, and whether to capture immediately.
+Before accepting the workflow as production-ready:
 
-Intuit's documented flow is:
+1. Confirm the Preview Vercel deployment uses the intended Supabase staging project. Preview must not create test invoices in the production database.
+2. Confirm `QBO_ENVIRONMENT=sandbox` and the callback URL matches Intuit's Development app configuration.
+3. Connect a dedicated Intuit sandbox company.
+4. Verify that the company has the correct home currency and multicurrency settings.
+5. Configure one shared active QuickBooks Service item with the intended default tax treatment.
+6. Match a Njia Smart test client to its correct QuickBooks Customer.
+7. Send one finalised test invoice and compare line descriptions, quantities, unit prices, tax and total in QuickBooks.
+8. Click Send again and confirm the same QuickBooks Invoice ID is returned.
+9. Record a test payment directly in QuickBooks, refresh status in Njia Smart, and confirm the paid and outstanding amounts.
+10. Confirm Njia Smart's own invoice and payment rows were not changed by the QuickBooks refresh.
+11. Review Vercel build/runtime logs and Supabase security advisors.
 
-1. The customer's payment details are tokenised using the Payments API from the browser. The browser receives an opaque token; Njia Smart should not receive or store the card number or CVC.
-2. Submit that one-time token from the server to the Charges endpoint.
-3. If the charge was created with capture disabled, capture the authorised charge with the returned charge ID.
-
-The Intuit payment token is single-use and expires after 15 minutes. Obtain it through Intuit's approved client-side tokenisation flow or sandbox tooling, then paste only the opaque token into Njia Smart.
-
-The charge request is based on Intuit's Payments guide:
-
-```http
-POST https://sandbox.api.intuit.com/quickbooks/v4/payments/charges
-Authorization: Bearer {access_token}
-Content-Type: application/json
-Accept: application/json
-Request-Id: {unique-request-id}
-
-{
-  "amount": "1.00",
-  "currency": "USD",
-  "capture": "false",
-  "token": "{one-time-payment-token}"
-}
-```
-
-- With **Capture immediately** unchecked, Intuit creates an authorisation. The form offers **Capture authorised charge** after an `AUTHORIZED` response.
-- With **Capture immediately** checked, the charge request is sent with `capture: "true"`.
-- Payment submission and capture are restricted to Director/Admin users by the database-backed integration permission check.
-- A unique `Request-Id` is generated for each operation. The response displayed in Njia Smart deliberately omits the payment token.
-
-The separate capture call uses the charge ID and amount returned by the authorisation:
-
-```http
-POST https://sandbox.api.intuit.com/quickbooks/v4/payments/charges/{chargeId}/capture
-Authorization: Bearer {access_token}
-Content-Type: application/json
-Accept: application/json
-Request-Id: {unique-request-id}
-
-{ "amount": "1.00" }
-```
-
-The charge form is for sandbox verification only. No production Payments endpoint or production credential is enabled on this branch.
-
-## 5. Token refresh and error handling
-
-- The server checks the stored access-token expiry before each API call.
-- When an access token is near expiry, the server refreshes it using the latest refresh token and stores the rotated token bundle in Supabase Vault.
-- If an API call returns HTTP 401, the server forces one refresh and retries the request once. Payment retries reuse the same `Request-Id`.
-- Intuit error responses are reduced to the HTTP status and provider error code. Raw provider payloads and token material are not logged or returned.
-- Intuit refresh tokens rotate. Always use the most recently returned refresh token; reauthorisation is required when the refresh token expires or is revoked.
-
-## 6. Permissions and current limits
-
-- Director/Admin: connect, disconnect, view API examples, create and capture sandbox payment charges.
-- Accountant: connect and view assigned-client API examples.
-- Audit Manager/Tax Consultant: view-only where the client assignment and integration permission check allow it.
-- Other roles: no integration access.
-
-Implemented on this branch: OAuth authorization-code flow, single-use state, Vault-backed token storage, token refresh/revocation, CompanyInfo, OpenID userinfo, and sandbox charge/authorisation capture examples.
-
-Not implemented: bulk customer/invoice/payment synchronisation, production credentials, production Payments calls, and general accounting write operations. The API examples do not start a background synchronisation job or save returned provider records.
+A successful build alone does not prove OAuth, invoice creation, tax calculation or payment-status refresh has passed end-to-end testing.
 
 ## Official Intuit references
 
-- [OAuth 2.0 setup and authorization-code flow](https://developer.intuit.com/app/developer/qbo/docs/develop/authentication-and-authorization/oauth-2.0)
-- [Intuit Developer official Node.js OAuth 2.0 sample](https://github.com/IntuitDeveloper/oauth2-nodejs)
-- [Process a payment – Payments API workflow](https://developer.intuit.com/app/developer/qbpayments/docs/workflows/process-a-payment)
-- [CompanyInfo API reference](https://developer.intuit.com/docs/api/accounting/CompanyInfo)
+- [OAuth 2.0 authorization-code flow](https://developer.intuit.com/app/developer/qbo/docs/develop/authentication-and-authorization/oauth-2.0)
+- [QuickBooks Invoice create/read API](https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/invoice)
+- [QuickBooks query syntax](https://static.developer.intuit.com/output_html/qbo/docs/learn/explore-the-quickbooks-online-api/data-queries.html)
+- [QuickBooks invoice workflow](https://static.developer.intuit.com/output_html/qbo/docs/workflows/create-an-invoice.html)
