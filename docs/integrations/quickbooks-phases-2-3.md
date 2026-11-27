@@ -44,11 +44,13 @@ The previous broad payment-write and full-mirror UI/functions have been removed 
 
 ## Configuration
 
-Server-side Preview variables:
+Server-side Vercel Preview variables (restricted to the feature branch):
 - `QBO_ENVIRONMENT=sandbox`
 - `QBO_CLIENT_ID`
 - `QBO_CLIENT_SECRET`
-- `QBO_REDIRECT_URI`
+- `QBO_REDIRECT_URI=https://gk-nahashon-git-qbo-simplified-inv-2c23f2-hermanngugis-projects.vercel.app/api/integrations/qbo/callback`
+
+Keep Production QBO variables unchanged. The eventual Production callback is `https://gk-nahashon.vercel.app/api/integrations/qbo/callback` and should be configured only after a separate production approval.
 
 Only `com.intuit.quickbooks.accounting` is requested. Do not expose Intuit credentials or Supabase service-role credentials in browser variables.
 
