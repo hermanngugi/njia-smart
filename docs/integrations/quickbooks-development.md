@@ -62,7 +62,7 @@ Each Njia Smart line becomes a QuickBooks SalesItemLineDetail using the one shar
 - unit price,
 - calculated line amount.
 
-The same Service item is used for every line. Njia Smart does not send its own VAT amount or tax-code value. QuickBooks applies the tax treatment configured for the selected Service item and Customer. For non-US QuickBooks companies, the invoice uses `GlobalTaxCalculation: TaxExcluded`; US companies do not receive that field.
+The same Service item is used for every line. Njia Smart does not send its own VAT amount or tax-code value. For non-US QuickBooks companies, the server reads the Service item's configured `SalesTaxCodeRef` and applies that same QuickBooks tax code to each line, with `GlobalTaxCalculation: TaxExcluded`. For US companies, the line taxable flag is derived from the Service item's taxable setting (TAX/NON); where sales tax is enabled, the mapped Customer's default tax code is used when available. US companies do not receive `GlobalTaxCalculation`.
 
 **Tax implication:** because all lines use one shared Service item, all lines follow that item's QuickBooks tax defaults (subject to the Customer's tax settings). If a single Njia Smart invoice contains a mixture of standard-rated, exempt and zero-rated lines, this one-item setup will not preserve those separate line-level tax classifications. The shared QuickBooks item and customer tax settings must therefore be configured to match the intended invoice treatment before sending.
 
