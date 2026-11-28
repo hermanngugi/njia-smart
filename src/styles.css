@@ -291,3 +291,8 @@ body { overscroll-behavior-y: contain; }
     translate: -50% 0 !important;
   }
 }
+
+@media print {
+  .app-sidebar,
+  header { display: none !important; }
+}

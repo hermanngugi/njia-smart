@@ -58,8 +58,10 @@ export function useTaskWorkspace(taskId: string) {
     ids.forEach(id => notifyUser({ user_id: id, type, title, body: task.title, link: `/tasks?task=${taskId}` }));
   };
 
-  async function setStatus(status: string, waiting?: { reason: string; followUpOn: string }) {
+  async function setStatus(status: string, waiting?: { reason: string; followUpOn: string }, note?: string) {
     const patch: any = { status };
+    if (status === "done") patch.outcome = note;
+    if (status === "cancelled") patch.cancel_reason = note;
     if (status === "waiting_on_client" && waiting) {
       patch.waiting_reason = waiting.reason;
       patch.follow_up_on = waiting.followUpOn || null;
@@ -71,9 +73,28 @@ export function useTaskWorkspace(taskId: string) {
     load();
   }
 
-  async function addSubtask(title: string) {
+  async function postUpdate(done: string, next: string) {
+    if (!user) return false;
+    const { error } = await supabase.from("task_comments").insert({
+      task_id: taskId, author_id: user.id, kind: "update", body: done.trim(), next_action: next.trim() || null,
+    } as any);
+    if (error) { toast.error(error.message); return false; }
+    notifyTeam("task_update", "Progress update on a task");
+    load();
+    return true;
+  }
+
+  async function takeOver(reason: string) {
+    const { error } = await supabase.rpc("take_over_task" as any, { _task_id: taskId, _reason: reason } as any);
+    if (error) { toast.error(error.message); return false; }
+    toast.success("The task is now yours");
+    load();
+    return true;
+  }
+
+  async function addSubtask(title: string, due?: string, owner?: string) {
     if (!title.trim() || !user) return false;
-    const { error } = await supabase.from("task_subtasks").insert({ task_id: taskId, title: title.trim(), created_by: user.id });
+    const { error } = await supabase.from("task_subtasks").insert({ task_id: taskId, title: title.trim(), created_by: user.id, due_date: due || null, assigned_to: owner || task?.assigned_to || user.id });
     if (error) { toast.error(error.message); return false; }
     load();
     return true;
@@ -144,7 +165,7 @@ export function useTaskWorkspace(taskId: string) {
   return {
     user, isAdmin, task, subtasks, updates, outputs, loading, missingSetup, busy,
     isLead, isSupervisor, subtasksDone, nameOf,
-    setStatus, addSubtask, toggleSubtask, removeSubtask,
+    setStatus, postUpdate, takeOver, staff, addSubtask, toggleSubtask, removeSubtask,
     postComment, removeUpdate, uploadOutput, removeOutput, openOutput,
   };
 }

@@ -138,6 +138,7 @@ function AuditDetail() {
             <span className="text-muted-foreground">Due </span>{shortDate(e.due_date)}
             {e.status !== "completed" && dueIn !== null && dueIn < 0 && <span className="ml-1 text-xs text-red-600">{-dueIn}d overdue</span>}
           </div>
+          <Link to="/tasks" search={{ engagement: id } as any} className="text-primary hover:underline">Tasks for this audit</Link>
           {overdueSteps > 0 && <div className="text-red-600">{overdueSteps} step{overdueSteps === 1 ? "" : "s"} overdue</div>}
           {e.client_id && <div className="flex items-center gap-2"><span className="text-muted-foreground">Team</span><ClientAssignments clientId={e.client_id} compact /></div>}
           {e.updated_at && <div className="text-xs text-muted-foreground ml-auto">Updated {formatDateTime(e.updated_at)}</div>}
