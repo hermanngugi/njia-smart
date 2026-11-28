@@ -5,11 +5,13 @@ const TOKEN_ENDPOINT = "https://oauth.platform.intuit.com/oauth2/v1/tokens/beare
 const REVOCATION_ENDPOINT = "https://developer.api.intuit.com/v2/oauth2/tokens/revoke";
 export const QBO_REQUESTED_SCOPES = ["com.intuit.quickbooks.accounting"] as const;
 
+export type QboEnvironment = "sandbox" | "production";
+
 export type QboConfig = {
   clientId: string;
   clientSecret: string;
   redirectUri: string;
-  environment: "sandbox";
+  environment: QboEnvironment;
 };
 
 export type QboTokenResponse = {
@@ -51,11 +53,11 @@ export function getQboConfig(): QboConfig {
     ...(!redirectUri ? ["QBO_REDIRECT_URI"] : []),
   ];
   if (missing.length) {
-    throw new Error(`QuickBooks development configuration is incomplete: ${missing.join(", ")}`);
+    throw new Error(`QuickBooks configuration is incomplete: ${missing.join(", ")}`);
   }
 
-  if (environment !== "sandbox") {
-    throw new Error("This development branch only supports the QuickBooks sandbox environment.");
+  if (environment !== "sandbox" && environment !== "production") {
+    throw new Error("QBO_ENVIRONMENT must be either sandbox or production.");
   }
 
   let parsedRedirect: URL;
@@ -80,7 +82,7 @@ export function getQboConfig(): QboConfig {
     clientId: clientId!,
     clientSecret: clientSecret!,
     redirectUri: redirectUri!,
-    environment: "sandbox",
+    environment: environment as QboEnvironment,
   };
 }
 
@@ -268,7 +270,7 @@ export async function getFreshQboAccessToken(integrationId: string, forceRefresh
     .select("status, access_token_expires_at, refresh_token_expires_at")
     .eq("id", integrationId)
     .eq("provider", "quickbooks_online")
-    .eq("environment", "sandbox")
+    .eq("environment", config.environment)
     .maybeSingle();
 
   if (connectionResult.error || !connectionResult.data) {
@@ -360,6 +362,8 @@ export async function getFreshQboAccessToken(integrationId: string, forceRefresh
   }
 }
 
-export async function getQboAdminClient() {
-  return supabaseAdmin;
+export function qboApiBase(environment: QboEnvironment): string {
+  return environment === "production"
+    ? "https://quickbooks.api.intuit.com/v3/company"
+    : "https://sandbox-quickbooks.api.intuit.com/v3/company";
 }

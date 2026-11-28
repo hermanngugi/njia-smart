@@ -3,73 +3,64 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
-  buildQboAuthorizationUrl,
-  clearQboCredentials,
-  createOAuthState,
-  getQboConfig,
-  hashOAuthState,
-  QBO_REQUESTED_SCOPES,
-  readQboCredentials,
-  revokeQboTokens,
+  buildQboAuthorizationUrl, clearQboCredentials, createOAuthState, getQboConfig, hashOAuthState,
+  QBO_REQUESTED_SCOPES, readQboCredentials, revokeQboTokens,
 } from "@/lib/integrations/qbo.server";
+import { assertCompanyAccess, companyOverview, getCompanyConnection, syncCompany } from "@/lib/integrations/qbo.company.server";
 
 const db = supabaseAdmin as any;
 
-async function assertIntegrationAccess(userId: string, clientId: string, action: "view" | "connect" | "sync" | "disconnect" | "approve") {
-  const { data, error } = await db.rpc("integration_client_access_check", {
-    _user_id: userId, _client_id: clientId, _action: action,
-  });
-  if (error || data !== true) throw new Error("You are not authorised to perform this integration action for this client.");
-}
-
-export const startQboAuthorization = createServerFn({ method: "POST" })
+/** Connection status plus, when connected, the comparison with Njia Smart's invoices. */
+export const getQboCompany = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ client_id: z.string().uuid() }).parse(input))
-  .handler(async ({ data, context }) => {
+  .handler(async ({ context }) => {
+    try { await assertCompanyAccess(context.userId, "view"); }
+    catch { return { allowed: false as const }; }
+    let status;
+    try { status = await getCompanyConnection(); }
+    catch (e) { return { allowed: true as const, configured: false as const, message: e instanceof Error ? e.message : "QuickBooks is not configured." }; }
+    const overview = status.connection?.status === "connected" ? await companyOverview(status.connection.id) : null;
+    return { allowed: true as const, configured: true as const, ...status, overview };
+  });
+
+export const startQboCompanyAuthorization = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertCompanyAccess(context.userId, "manage");
     const config = getQboConfig();
-    await assertIntegrationAccess(context.userId, data.client_id, "connect");
     const state = createOAuthState();
-    const stateHash = await hashOAuthState(state);
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + 10 * 60 * 1000).toISOString();
     await db.from("integration_auth_states").delete().eq("provider", "quickbooks_online").lt("expires_at", now.toISOString());
     const { error } = await db.from("integration_auth_states").insert({
-      client_id: data.client_id, provider: "quickbooks_online", environment: "sandbox",
-      state_hash: stateHash, requested_scopes: [...QBO_REQUESTED_SCOPES],
-      initiated_by: context.userId, expires_at: expiresAt,
+      client_id: null, provider: "quickbooks_online", environment: config.environment,
+      state_hash: await hashOAuthState(state), requested_scopes: [...QBO_REQUESTED_SCOPES],
+      initiated_by: context.userId, expires_at: new Date(now.getTime() + 10 * 60 * 1000).toISOString(),
     });
     if (error) throw new Error("Could not start QuickBooks authorisation. Please try again.");
     return { authorization_url: buildQboAuthorizationUrl(config, state) };
   });
 
-export const getQboConnectionStatus = createServerFn({ method: "GET" })
+export const refreshQboCompany = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ client_id: z.string().uuid() }).parse(input))
-  .handler(async ({ data, context }) => {
-    try { await assertIntegrationAccess(context.userId, data.client_id, "view"); }
-    catch { return { allowed: false, connection: null }; }
-    const { data: connection, error } = await db.from("client_integrations")
-      .select("id,status,external_account_id,external_account_name,country_code,last_connected_at,last_synced_at,access_token_expires_at,refresh_token_expires_at,last_error_code")
-      .eq("client_id", data.client_id).eq("provider", "quickbooks_online")
-      .eq("environment", "sandbox").neq("status", "disconnected")
-      .order("created_at", { ascending: false }).limit(1).maybeSingle();
-    if (error) throw new Error("Could not load the QuickBooks connection status.");
-    return { allowed: true, connection: connection ?? null };
+  .handler(async ({ context }) => {
+    await assertCompanyAccess(context.userId, "view");
+    const { connection } = await getCompanyConnection();
+    if (!connection || connection.status !== "connected") throw new Error("QuickBooks is not connected.");
+    return await syncCompany(connection.id);
   });
 
-export const disconnectQboConnection = createServerFn({ method: "POST" })
+export const disconnectQboCompany = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ client_id: z.string().uuid(), integration_id: z.string().uuid() }).parse(input))
+  .inputValidator((input: unknown) => z.object({ integration_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    await assertIntegrationAccess(context.userId, data.client_id, "disconnect");
-    const { data: connection, error } = await db.from("client_integrations")
-      .select("id,client_id,provider,environment,status")
-      .eq("id", data.integration_id).eq("client_id", data.client_id)
-      .eq("provider", "quickbooks_online").eq("environment", "sandbox").maybeSingle();
-    if (error || !connection) throw new Error("QuickBooks connection was not found.");
-    if (connection.status === "disconnected") return { ok: true };
-    const credentials = await readQboCredentials(data.integration_id);
-    await revokeQboTokens(getQboConfig(), credentials);
+    await assertCompanyAccess(context.userId, "manage");
+    const { data: row, error } = await db.from("client_integrations").select("id,status")
+      .eq("id", data.integration_id).is("client_id", null).eq("provider", "quickbooks_online").maybeSingle();
+    if (error || !row) throw new Error("QuickBooks connection was not found.");
+    if (row.status === "disconnected") return { ok: true };
+    await revokeQboTokens(getQboConfig(), await readQboCredentials(data.integration_id));
     await clearQboCredentials(data.integration_id);
+    await db.from("qbo_invoices").delete().eq("integration_id", data.integration_id);
+    await db.from("qbo_payments").delete().eq("integration_id", data.integration_id);
     return { ok: true };
   });
