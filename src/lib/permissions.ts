@@ -278,7 +278,7 @@ export const NAV_MODULE_BY_PATH: Record<string, ModuleKey> = {
   "/outsourced-accounting": "outsourced_accounting",
   "/payroll-management": "payroll_management",
   "/financial-business-management": "financial_business_management",
-  "/ict": "ict",
+  "/ict": "ict_service_desk",
   "/ict-service-desk": "ict_service_desk",
   "/tasks": "tasks",
   "/accounts": "accounts",

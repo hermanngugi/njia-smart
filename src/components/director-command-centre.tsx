@@ -33,7 +33,7 @@ const ENGAGEMENT_LINES = [
   { label: "Outsourced Accounting", to: "/outsourced-accounting", module: "outsourced_accounting" },
   { label: "Payroll", to: "/payroll-management", module: "payroll_management" },
   { label: "Financial Business Mgmt", to: "/financial-business-management", module: "financial_business_management" },
-  { label: "ICT", to: "/ict", module: "ict" },
+  { label: "ICT", to: "/ict", module: "ict_service_desk" },
 ] as const;
 
 // These modules share the service-module page, which understands ?tab=projects&filter=active.
