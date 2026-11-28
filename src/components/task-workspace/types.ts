@@ -1,6 +1,6 @@
 // Shared constants and helpers for tasks.
 
-export const TASK_STATUSES = ["todo", "in_progress", "waiting_on_client", "done"] as const;
+export const TASK_STATUSES = ["todo", "in_progress", "waiting_on_client", "done", "cancelled"] as const;
 
 // "blocked" is no longer offered, but any older record still reads properly.
 export const STATUS_LABEL: Record<string, string> = {
@@ -9,7 +9,28 @@ export const STATUS_LABEL: Record<string, string> = {
   waiting_on_client: "Waiting on client",
   blocked: "Blocked",
   done: "Done",
+  cancelled: "Cancelled",
 };
+
+export const isClosed = (task: any) => task?.status === "done" || task?.status === "cancelled";
+
+/** Monday-to-Friday days gone by since a timestamp. */
+export function workingDaysSince(iso?: string | null): number {
+  if (!iso) return 0;
+  const day = new Date(iso);
+  day.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let n = 0;
+  while (day < today) {
+    day.setDate(day.getDate() + 1);
+    if (day.getDay() !== 0 && day.getDay() !== 6) n++;
+  }
+  return n;
+}
+
+/** In progress with no progress update or step change for 3 working days. */
+export const isStale = (task: any) => task?.status === "in_progress" && workingDaysSince(task.last_update_at ?? task.created_at) >= 3;
 
 /** Waiting on the client (not on us): not counted as overdue against the assignee. */
 export const isWaitingOnClient = (task: any) => task?.status === "waiting_on_client";
