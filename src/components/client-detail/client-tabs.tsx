@@ -1,8 +1,6 @@
 import { Trash2, Eye, Download } from "lucide-react";
 import { formatDate } from "@/lib/format";
 import { ClientAssignments } from "@/components/client-assignments";
-import { QboIntegrationPanel } from "./qbo-integration-panel";
-import { useAuth } from "@/lib/auth";
 import { ObligationContacts } from "@/components/obligation-contacts";
 import { TaxObligations } from "@/components/tax-obligations-panel";
 import { Button } from "@/components/ui/button";
@@ -12,8 +10,7 @@ import type { ClientDetailCtx } from "./use-client-detail";
 
 export function ClientTabs({ ctx }: { ctx: ClientDetailCtx }) {
   const { isAdmin, canEditTax, tab, setTab, related, taxPolicies, obligations, openDocument, deleteClientDocument, deleteFilingRecord, openAdd, id, search } = ctx;
-  const { canView } = useAuth();
-  const visibleTabs = canView("integrations") ? TABS : TABS.filter(t => t !== "Integrations");
+  const visibleTabs = TABS;
   return (
     <>
       <div className="flex flex-wrap gap-1 border-b">
@@ -46,7 +43,6 @@ export function ClientTabs({ ctx }: { ctx: ClientDetailCtx }) {
           </Card>
         </div>
       )}
-      {tab === "Integrations" && canView("integrations") && <QboIntegrationPanel clientId={id} />}
       {tab === "Tax" && (
         <div className="space-y-3">
           <div className="rounded-md border bg-card px-3 py-2 text-sm">

@@ -1,9 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useChildMatches } from "@tanstack/react-router";
 import { openStoredFile } from "@/lib/client-files";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, X, Trash2, FileText, Wallet, AlertCircle, TrendingUp, Paperclip, Receipt, Download } from "lucide-react";
+import { Plus, X, Trash2, FileText, Wallet, AlertCircle, TrendingUp, Paperclip, Receipt, Download, RefreshCw } from "lucide-react";
 import { formatDate, STATUS_COLORS } from "@/lib/format";
 import { useAuth } from "@/lib/auth";
 
@@ -11,8 +11,16 @@ export const Route = createFileRoute("/_authed/accounts")({
   validateSearch: (s: Record<string, unknown>) => ({
     filter: s.filter === "outstanding" || s.filter === "overdue" || s.filter === "collected" ? s.filter : undefined,
   }),
-  component: AccountsPage,
+  component: AccountsRoute,
 });
+
+// /accounts/$id (invoice) and /accounts/quickbooks are child routes. Without an <Outlet />
+// the parent keeps rendering this list and the child page never opens.
+function AccountsRoute() {
+  const childMatches = useChildMatches();
+  if (childMatches.length > 0) return <Outlet />;
+  return <AccountsPage />;
+}
 
 const STATUS = ["draft", "sent", "partial", "paid", "overdue"];
 const SERVICE_LINES = [
@@ -232,6 +240,11 @@ function AccountsPage() {
           <p className="text-sm text-muted-foreground">{restricted ? `${rows.length} of your invoices` : `${rows.length} invoices`}</p>
         </div>
         <div className="flex gap-2">
+          {!restricted && (
+            <Link to="/accounts/quickbooks" className="inline-flex items-center gap-2 px-3 h-9 rounded-md border text-sm font-medium">
+              <RefreshCw className="h-4 w-4" /> QuickBooks
+            </Link>
+          )}
           <button onClick={() => setPayOpen(true)} className="inline-flex items-center gap-2 px-3 h-9 rounded-md border text-sm font-medium">
             <Receipt className="h-4 w-4" /> Record Payment
           </button>
