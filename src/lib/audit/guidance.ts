@@ -4,7 +4,7 @@
  */
 
 export const PACK_ID = "ke-private-financial-audit";
-export const PACK_VERSION = 1;
+export const PACK_VERSION = 2;
 
 /** Procedure statuses as stored in the database. */
 export const STATUS_LABEL: Record<string, string> = {

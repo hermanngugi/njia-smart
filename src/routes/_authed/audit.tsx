@@ -113,7 +113,6 @@ function AuditPage() {
       due_date: payload.due_date || null,
       start_date: payload.start_date || null,
       status: payload.status,
-      completion_pct: Number(payload.completion_pct) || 0,
       notes: payload.notes,
     }).eq("id", id);
     if (error) toast.error(error.message);
@@ -290,7 +289,6 @@ function AuditPage() {
                   <option value="completed">Completed</option>
                 </select>
               </div>
-              <div><label className="text-xs font-medium">Progress %</label><input type="number" min={0} max={100} value={editRow.completion_pct ?? 0} onChange={e=>setEditRow({...editRow, completion_pct:e.target.value})} className="mt-1 w-full h-9 px-3 rounded-md border bg-background text-sm" /></div>
             </div>
             <textarea placeholder="Notes" value={editRow.notes ?? ""} onChange={e=>setEditRow({...editRow, notes:e.target.value})} rows={3} className="w-full px-3 py-2 rounded-md border bg-background text-sm" />
             <button className="w-full h-10 rounded-md bg-primary text-primary-foreground text-sm font-medium">Save changes</button>

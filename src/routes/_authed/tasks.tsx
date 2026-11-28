@@ -17,6 +17,7 @@ export const Route = createFileRoute("/_authed/tasks")({
     status: typeof s.status === "string" ? s.status : undefined,
     overdue: s.overdue === true || s.overdue === "true" ? true : undefined,
     task: typeof s.task === "string" ? s.task : undefined,
+    engagement: typeof s.engagement === "string" ? s.engagement : undefined,
   }),
 });
 
@@ -36,7 +37,12 @@ function groupOf(t: any): (typeof GROUPS)[number] {
 
 function TasksPage() {
   const { user, isAdmin, canDelete } = useAuth();
-  const { status: statusFilter, overdue: overdueFilter, task: taskParam } = Route.useSearch();
+  const { status: statusFilter, overdue: overdueFilter, task: taskParam, engagement: engagementId } = Route.useSearch();
+  const [engagement, setEngagement] = useState<{ title: string; client_id: string | null } | null>(null);
+  useEffect(() => {
+    setEngagement(null);
+    if (engagementId) supabase.from("engagements").select("title, client_id").eq("id", engagementId).maybeSingle().then(({ data }) => setEngagement(data));
+  }, [engagementId]);
   const navigate = useNavigate({ from: Route.fullPath });
   const [rows, setRows] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
@@ -68,12 +74,12 @@ function TasksPage() {
   function closeWorkspace() {
     setDetailId(null);
     load();
-    if (taskParam) navigate({ search: { status: statusFilter, overdue: overdueFilter, task: undefined } });
+    if (taskParam) navigate({ search: { status: statusFilter, overdue: overdueFilter, task: undefined, engagement: engagementId } });
   }
 
   const nameOf = (id?: string | null) => (id ? staff.find((p: any) => p.id === id)?.full_name : null) || null;
 
-  function openNew() { setForm(EMPTY); setMore(false); setOpen(true); }
+  function openNew() { setForm({ ...EMPTY, client_id: engagement?.client_id ?? "" }); setMore(false); setOpen(true); }
   function openEdit(r: any) {
     setForm({ id: r.id, title: r.title, description: r.description || "", client_id: r.client_id || "", assigned_to: r.assigned_to || "", priority: r.priority, due_date: r.due_date || "" });
     setMore(true);
@@ -109,7 +115,7 @@ function TasksPage() {
     const taskId: string = form.id || crypto.randomUUID();
     const { error } = form.id
       ? await supabase.from("tasks").update(payload).eq("id", taskId)
-      : await supabase.from("tasks").insert({ ...payload, id: taskId, created_by: user?.id });
+      : await supabase.from("tasks").insert({ ...payload, id: taskId, created_by: user?.id, engagement_id: engagementId ?? null, ...(engagementId ? { client_id: engagement?.client_id ?? null } : {}) });
     setSaving(false);
     if (error) return toast.error(error.message);
     toast.success(form.id ? "Task updated" : "Task created");
@@ -159,6 +165,7 @@ function TasksPage() {
 
   const visible = rows.filter(r =>
     (view === "all" || r.assigned_to === user?.id) &&
+    (!engagementId || r.engagement_id === engagementId) &&
     (!statusFilter || r.status === statusFilter) &&
     (!overdueFilter || (r.status !== "done" && r.status !== "waiting_on_client" && r.is_overdue === true))
   );
@@ -207,14 +214,20 @@ function TasksPage() {
       <div className="flex flex-wrap justify-between items-center gap-3">
         <div>
           <h1 className="text-2xl font-bold">Tasks</h1>
+          {engagementId && (
+            <p className="text-sm text-muted-foreground">
+              For audit <Link to="/audit/$id" params={{ id: engagementId }} className="font-medium text-primary hover:underline">{engagement?.title ?? "…"}</Link>. New tasks are linked to it.{" "}
+              <Link to="/tasks" search={{} as any} className="hover:underline">Show all tasks</Link>
+            </p>
+          )}
           {(statusFilter || overdueFilter) && (
             <p className="text-sm text-muted-foreground">
               Filtered to <span className="font-medium text-foreground">{overdueFilter ? "overdue" : STATUS_LABEL[statusFilter!] ?? statusFilter}</span>{" "}
-              <button onClick={() => navigate({ search: { status: undefined, overdue: undefined, task: undefined } })} className="text-primary hover:underline">clear</button>
+              <button onClick={() => navigate({ search: { status: undefined, overdue: undefined, task: undefined, engagement: engagementId } })} className="text-primary hover:underline">clear</button>
             </p>
           )}
         </div>
-        <button onClick={openNew} className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm inline-flex items-center gap-2"><Plus className="h-4 w-4" /> Give task</button>
+        <button onClick={openNew} disabled={!!engagementId && !engagement} className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm inline-flex items-center gap-2"><Plus className="h-4 w-4" /> Give task</button>
       </div>
 
       <div className="flex gap-1.5">

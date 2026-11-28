@@ -93,7 +93,7 @@ export function useAuditData(engagementId: string) {
     const [procRes, riskRes, defRes] = await Promise.all([
       db.from("audit_engagement_procedures").select("*").eq("engagement_id", engagementId).order("created_at"),
       db.from("audit_risks").select("*").eq("engagement_id", engagementId).order("created_at", { ascending: false }),
-      db.from("audit_procedure_definitions").select("*").eq("pack_id", PACK_ID).eq("pack_version", PACK_VERSION),
+      db.from("audit_procedure_definitions").select("*").eq("pack_id", PACK_ID),
     ]);
     const firstError = procRes.error || riskRes.error || defRes.error;
     if (firstError) {
@@ -118,7 +118,7 @@ export function useAuditData(engagementId: string) {
       return;
     }
 
-    const defs = new Map<string, any>((defRes.data ?? []).map((d: any) => [d.procedure_id, d]));
+    const defs = new Map<string, any>((defRes.data ?? []).map((d: any) => [`${d.pack_version}:${d.procedure_id}`, d]));
     const latestResult = new Map<string, ProcedureResult>();
     for (const r of resultRes.data ?? []) if (!latestResult.has(r.engagement_procedure_id)) latestResult.set(r.engagement_procedure_id, r);
     const latestSignoff = new Map<string, Signoff>();
@@ -132,9 +132,9 @@ export function useAuditData(engagementId: string) {
       push(procsByRisk, l.risk_id, l.engagement_procedure_id);
     }
 
-    const packOrder = new Map((getAuditProcedurePack(PACK_ID, PACK_VERSION)?.procedures ?? []).map((p, i) => [p.id, i]));
+    const packOrder = new Map(([1, PACK_VERSION].flatMap((v) => getAuditProcedurePack(PACK_ID, v)?.procedures ?? [])).map((p, i) => [p.id, i]));
     const rows: ProcedureRow[] = procRows.map((p) => {
-      const d = defs.get(p.procedure_id);
+      const d = defs.get(`${p.pack_version}:${p.procedure_id}`);
       const def = d?.definition ?? {};
       return {
         id: p.id,
@@ -187,7 +187,9 @@ export function useAuditData(engagementId: string) {
   }
 
   const sections: SectionGroup[] = useMemo(() => {
-    const known = getAuditWorkspaceSections();
+    // Current sections first, then any older ones still used by an earlier checklist.
+    const current = getAuditWorkspaceSections();
+    const known = [...current, ...getAuditWorkspaceSections(PACK_ID, 1).filter((s) => !current.some((c) => c.id === s.id))];
     const groups = known.map((s) => {
       const list = procedures.filter((p) => p.sectionId === s.id);
       return { id: s.id, label: s.label, description: s.description, procedures: list, done: list.filter((p) => isDone(p.status)).length };

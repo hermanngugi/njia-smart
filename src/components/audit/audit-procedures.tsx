@@ -294,9 +294,9 @@ function ProcedureDialog({
             </label>
 
             <div>
-              <div className="text-sm font-medium flex items-center gap-1.5"><Link2 className="h-4 w-4" /> Attach evidence <span className="font-normal text-muted-foreground">(from the Documents tab)</span></div>
+              <div className="text-sm font-medium flex items-center gap-1.5"><Link2 className="h-4 w-4" /> Attach evidence <span className="font-normal text-muted-foreground">(from the Files tab)</span></div>
               {workpapers.length === 0 ? (
-                <p className="mt-1 text-xs text-muted-foreground">No documents uploaded yet. Upload files in the Documents tab, then attach them here.</p>
+                <p className="mt-1 text-xs text-muted-foreground">No documents uploaded yet. Upload files in the Files tab, then attach them here.</p>
               ) : (
                 <div className="mt-1 max-h-32 overflow-y-auto rounded-md border p-2 space-y-1">
                   {workpapers.map((w) => {
