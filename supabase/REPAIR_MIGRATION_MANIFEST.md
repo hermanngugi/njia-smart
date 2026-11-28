@@ -84,3 +84,4 @@ The repository's `supabase/config.toml` now points to the live project reference
 | `20261126091036` | `restore_tg_tax_return_filed_from_period_controls` | Restores `tg_tax_return_filed` exactly as defined by `20261125234500_tax_filing_invoice_period_controls` |
 | `20261126092039` | `20261126100000_tax_simplified_checklist` | 4-step filing checklist stamped with who/when, closing requires prepared + receipt + invoice, one owner per filing, deadline reminders (7/3/1/0 days), overdue alerts and a daily admin digest |
 | `20261127110302` | `audit_step_due_date` | Adds `due_date` to `audit_engagement_procedures` for per-step deadlines in the simplified audit checklist |
+| `20261127113711` | `audit_deadline_reminders` | Audit reminders added to the daily `send_deadline_reminders()` job: step due 3/1/0 days, step and engagement overdue 1/3/7 days then weekly, reviewer-waiting and sent-back nudges, engagement due 7/3/1/0, daily director/admin digest |
