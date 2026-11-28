@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, ClipboardCheck, Receipt, Lightbulb,
   ListTodo, Megaphone, FolderOpen, CalendarDays, UserCog, Settings,
   LogOut, Menu, History, Wallet, Monitor, Landmark, Wallet2, Briefcase,
-  Contact, MessageSquare, Headset, Link2, PanelLeftClose, PanelLeftOpen, X,
+  Contact, MessageSquare, Link2, PanelLeftClose, PanelLeftOpen, X,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -42,7 +42,6 @@ const NAV: { section: string; links: NavLink[] }[] = [
     { to: "/payroll-management", label: "Payroll Management", icon: Wallet2 },
     { to: "/financial-business-management", label: "Financial Business Mgmt", icon: Briefcase },
     { to: "/ict", label: "ICT", icon: Monitor },
-    { to: "/ict-service-desk", label: "ICT Service Desk", icon: Headset },
   ] },
   { section: "Office", links: [
     { to: "/accounts", label: "Accounts", icon: Wallet },

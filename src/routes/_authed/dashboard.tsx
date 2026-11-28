@@ -60,8 +60,8 @@ function IctDeskCard() {
   return (
     <div className={`bg-card border rounded-lg p-4 card-hover animate-fade-in-up ${critical > 0 ? "border-destructive/60" : ""}`}>
       <div className="flex items-center justify-between mb-3">
-        <h2 className="font-semibold inline-flex items-center gap-1.5"><Headset className="h-4 w-4" /> ICT Service Desk</h2>
-        <Link to="/ict-service-desk" className="text-xs text-primary hover:underline">Open service desk →</Link>
+        <h2 className="font-semibold inline-flex items-center gap-1.5"><Headset className="h-4 w-4" /> ICT requests</h2>
+        <Link to="/ict" className="text-xs text-primary hover:underline">Open ICT →</Link>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 text-center">
         <div><div className="text-2xl font-bold">{open.length}</div><div className="text-xs text-muted-foreground">Open tickets</div></div>
@@ -75,7 +75,7 @@ function IctDeskCard() {
         <ul className="divide-y text-sm">
           {newest.map((t) => (
             <li key={t.id} className="py-1.5 flex items-center justify-between gap-2">
-              <Link to="/ict-service-desk" className="truncate hover:underline">
+              <Link to="/ict" className="truncate hover:underline">
                 <span className="text-xs text-muted-foreground mr-1.5">{t.ticket_number}</span>{t.title}
               </Link>
               <span className={`text-xs shrink-0 ${t.priority === "Critical" ? "text-destructive font-medium" : "text-muted-foreground"}`}>{t.priority ?? "—"}</span>
